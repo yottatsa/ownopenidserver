@@ -1,19 +1,18 @@
 ownopenidserver
 ===============
 
-*ownopenidserver* is a small, one file and very own OpenID server for you site.
+*ownopenidserver* is a small and very own OpenID server for you site.
 
 
 Usage
 -----
-Tune source, create yadis-file and drop openidserver.py to cgi-bin directory.
+Just drop openidserver.py with templates to cgi-bin directory and tune your index.html
 
 Plan
 ----
 
- * [high] cgi-interface
- * [high] configuration file
- * [normal] serve yadis
+ * [normal] configuration file
+ * [normal] use sreg
 
 Bugs and suggestions
 --------------------

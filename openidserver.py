@@ -25,14 +25,7 @@ class TrustRootStore(object):
         import os.path
 
         url = urlparse.urlparse(url)
-        filename = urllib.quote('__'.join([
-                url.scheme or '',
-                url.username or '',
-                '_'.join([url.hostname or '', url.port and str(url.port) or '']),
-                '_'.join(url.path.split('/')),
-                url.params or '',
-                url.query or '',
-            ]))
+        filename = urllib.quote('__'.join(tuple(url)).replace('/', '_'))
 
         return os.path.join(self.directory, filename)
 
@@ -124,21 +117,24 @@ class OpenIDResponse(object):
         return self._encode_response(self.server.openid.handleRequest(self.request))
 
 
-    def approve(self):
+    def approve(self, identity=None):
         """
         Approve request
         TODO: sreg
 
         """
-        return self._encode_response(self.request.answer(True))
+        return self._encode_response(self.request.answer(
+                allow=True,
+                identity=identity
+            ))
 
 
-    def always(self):
+    def always(self, identity=None):
         """
         Approve request and to append to trust root store
         """
         self.server.trust_root_store.add(self.request.trust_root)
-        return self.approve()
+        return self.approve(identity)
 
 
     def decline(self):
@@ -146,7 +142,8 @@ class OpenIDResponse(object):
         Decline request
 
         """
-        return self._encode_response(self.request.answer(False))
+        return self._encode_response(self.request.answer(allow=False))
+
 
 
 class OpenIDServer(object):
@@ -163,166 +160,163 @@ class OpenIDServer(object):
         return OpenIDResponse(self, query)
 
 
-if __name__ == '__main__':
-
-    import openid.store.filestore
-    import openid.server.server
-    import cgi
-    import os
-    import sys
-    import string
-    import urllib
-
-    openid_store = openid.store.filestore.FileOpenIDStore('sstore')
-    openid_server = openid.server.server.Server(openid_store,
-            'http://127.0.0.1:8000/cgi-bin/openidserver.py')
-    trust_root_store = TrustRootStore('sstore/trust_root')
-    server = OpenIDServer(openid_server, trust_root_store)
-
-    if os.environ['REQUEST_METHOD'] in ['GET', 'POST']:
-        if os.environ['REQUEST_METHOD'] == 'GET':
-            QUERY = os.environ['QUERY_STRING']
-        elif os.environ['REQUEST_METHOD'] == 'POST':
-            QUERY = sys.stdin.read(int(os.environ['CONTENT_LENGTH']))
-        QUERY = dict(cgi.parse_qsl(QUERY))
-
-    TEMPLATE = string.Template(
-u"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ru" lang="ru">
-	<head>
-		<title>$title</title>
-		<style type="text/css">
-			body { background-color: #fff; font: 1.0em serif; color: black; }
-			h1 { top: 35%; font-size: 2.1em; padding-bottom: 0.3em; border-bottom: 1px solid gray; }
-		</style>
-	</head>
-    <body>
-		<h1>$header</h1>
-
-$body
-	</body>
-</html>
-""")
+def render_openid_to_response(response):
+    """
+    Return WebResponse as web.py response
+    """
+    if response.code in [200]:
+        for name, value in response.headers.items():
+            web.header(name, value)
+        return response.body
+    elif response.code in [302] and response.headers.has_key('location'):
+        return web.found(response.headers['location'])
+    else:
+        return web.HTTPError(str(response.code) + ' ', response.headers)
 
 
-    def error_page(message, debug=u''):
-        ERROR = string.Template(u"""
-        <p class="error">$message</p>
-        <pre>$debug</pre>
-        """)
+class WebOpenIDIndex(object):
 
-        print "Content-Type: text/html\r\n"
 
-        print TEMPLATE.substitute(
-                title=u'Error',
-                header=u'Error',
-                body=ERROR.substitute(
-                    message=message,
-                    debug=debug
-                ),
+    def GET(self):
+        web.header('Content-type', 'text/html')
+        return render.base(
+                endpoint=server.openid.op_endpoint,
+                yadis=web.ctx.homedomain + web.url('/yadis.xrds'),
             )
 
 
-    def decision_page(query, trust_root):
-        DECISION = string.Template(u"""
-        <p>Host $trust_root requested autorization</p>
-        <form method="post" action="/cgi-bin/openidserver.py/account/decision">
-            <input type="hidden" name="query" value="$query" />
-            <input type="submit" name="approve" value="Approve" />
-            <input type="submit" name="always" value="Always" />
-            <input type="submit" name="decline" value="Decline" />
-        </form>
-        """)
+class WebOpenIDYadis(object):
 
-        print "Content-Type: text/html\r\n"
 
-        print TEMPLATE.substitute(
-                title=u'Need decision',
-                header=u'Need decision',
-                body=DECISION.substitute(
-                    query=query,
-                    trust_root=trust_root
-                ),
+    def GET(self):
+        import openid.consumer
+        web.header('Content-type', 'application/xrds+xml')
+        return """<?xml version="1.0" encoding="UTF-8"?>\n<xrds:XRDS \
+                xmlns:xrds="xri://$xrds" xmlns="xri://$xrd*($v*2.0)"><XRD><Service \
+                priority="0"><Type>%s</Type><Type>%s</Type><URI>%s</URI><LocalID>%s</LocalID></Service></XRD></xrds:XRDS>""" %\
+            (
+                openid.consumer.discover.OPENID_2_0_TYPE,
+                openid.consumer.discover.OPENID_1_0_TYPE,
+                server.openid.op_endpoint,
+                web.ctx.homedomain,
             )
 
 
-    def print_response(response):
-        print "Status: %s " % response.code
-        for header, value in response.headers.items():
-            print '%s: %s' % (header, value)
-        if response.code in [302]:
-            error_page('<a href="%s">Redirect</a>' % response.headers['location'])
-        else:
-            print "Content-Type: text/plain\r\n"
-            print response.body
+class WebOpenIDEndpoint(object):
 
 
-    def redirect(location):
-        print "Status: 302"
-        print "Location: %s" % location
-        error_page('<a href="%s">Redirect</a>' % location)
+    def GET(self):
+        return self.endpoint()
 
 
-    URLMAP = dict()
+    def POST(self):
+        return self.endpoint()
 
 
-    def openid_endpoint(query, server, logged_in=False):
+    def endpoint(self, logged_in=False):
+        query = web.input()
+
         request = server.request(query)
         try:
             response = request.process(logged_in)
 
         except OpenIDResponse.NoneRequest:
-            error_page('No request')
-            return
-
-        except OpenIDResponse.DecisionNeed:
-            # redirect request to decision page in restricted area
-            location = "/cgi-bin/openidserver.py/account/decision?%s" % urllib.urlencode(query.items())
-            redirect(location)
-            return
+            return web.badrequest()
 
         except OpenIDResponse.LogInNeed:
             # redirect request to restricted area
-            location = "/cgi-bin/openidserver.py/account/endpoint?%s" % urllib.urlencode(query.items())
-            redirect(location)
-            return
+            return web.found(web.ctx.homedomain + web.url('/private/endpoint/', **dict(query)))
 
-        print_response(response)
+        except OpenIDResponse.DecisionNeed:
+            # redirect request to decision page in restricted area
+            return web.found(web.ctx.homedomain + web.url('/private/decision/', **dict(query)))
 
-    URLMAP[''] = lambda: openid_endpoint(query=QUERY, server=server, logged_in=False)
-    URLMAP['/account/endpoint'] = lambda: openid_endpoint(query=QUERY, server=server, logged_in=True)
+        return render_openid_to_response(response)
 
 
-    def decision(method, query, server):
-        if method == 'GET':
-            request = server.request(query)
-        elif method == 'POST':
-            request = server.request(dict(cgi.parse_qsl(query['query'])))
+class WebOpenIDPrivateEndpoint(WebOpenIDEndpoint):
+
+
+    def endpoint(self):
+        return super(WebOpenIDPrivateEndpoint, self).endpoint(logged_in=True)
+
+
+class WebOpenIDDecision(object):
+
+
+    def GET(self):
+        query = web.input()
+
+        request = server.request(query)
 
         try:
             response = request.process(logged_in=True)
 
         except OpenIDResponse.NoneRequest:
-            error_page('No request')
-            return
+            return web.badrequest()
 
         except OpenIDResponse.DecisionNeed:
-            if method == 'GET':
-                decision_page(urllib.urlencode(query.items()),
-                        request.request.trust_root)
-                return
+            web.header('Content-type', 'text/html')
+            return render.verify(
+                    identity=request.request.identity,
+                    trust_root=request.request.trust_root,
+                    query=dict(query).items(),
 
-            elif method == 'POST':
-                if query.has_key('approve'):
-                    response = request.approve()
-                elif query.has_key('always'):
-                    response = request.always()
-                elif query.has_key('decline'):
-                    response = request.decline()
+                )
 
-        print_response(response)
-
-    URLMAP['/account/decision'] = lambda: decision(method=os.environ['REQUEST_METHOD'], query=QUERY, server=server)
+        return render_openid_to_response(response)
 
 
-    URLMAP.get(os.environ['PATH_INFO'], cgi.test)()
+    def POST(self):
+        query = web.input()
+
+        request = server.request(query)
+
+        try:
+            response = request.process(logged_in=True)
+
+        except OpenIDResponse.NoneRequest:
+            return web.badrequest()
+
+        except OpenIDResponse.DecisionNeed:
+            if query.has_key('approve'):
+                response = request.approve()
+            elif query.has_key('always'):
+                response = request.always()
+            else:
+                response = request.decline()
+
+        return render_openid_to_response(response)
+
+
+if __name__ == '__main__':
+    import os
+
+    import openid.store.filestore
+    import openid.server.server
+
+    import web
+    import web.contrib.template
+
+    urls = (
+            '/', 'WebOpenIDIndex',
+            '/private/', 'WebOpenIDIndex',
+            '/yadis.xrds', 'WebOpenIDYadis',
+            '/endpoint/', 'WebOpenIDEndpoint',
+            '/private/endpoint/', 'WebOpenIDPrivateEndpoint',
+            '/private/decision/', 'WebOpenIDDecision',
+        )
+
+    app = web.application(urls, globals())
+    app.load(os.environ)
+
+    openid_store = openid.store.filestore.FileOpenIDStore('sstore')
+    openid_server = openid.server.server.Server(openid_store,
+            web.ctx.homedomain + web.url('/endpoint/'))
+    trust_root_store = TrustRootStore('sstore/trust_root')
+
+    server = OpenIDServer(openid_server, trust_root_store)
+
+    render = web.contrib.template.render_jinja('.')
+
+    app.run()

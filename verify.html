@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block title %}Verification request{% endblock %}
+
+{% block content %}
+			<h2>Verification request</h2>
+
+			<p>The site <tt>{{ trust_root|escape }}</tt> has requested verification of your OpenID.</p>
+
+			<form method="post" action=".">
+				<p>Verify your identity to the relying party?</p>
+
+				<input type="submit" value="Yes (Allow)" name="approve" />
+				<input type="submit" value="Always (Allow)" name="always" />
+				<input type="submit" value="No (Cancel)" name="decline" />{% for item in query %}
+				<input type="hidden" name="{{ item.0 }}" value="{{ item.1 }}" />{% endfor %}
+			</form>
+{% endblock %}
