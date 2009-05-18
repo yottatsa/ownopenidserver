@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block title %}Password request{% endblock %}
+
+{% block content %}
+			<h2>Password request</h2>
+
+			<form method="post" action=".">
+				<fieldset>
+{{ form.render_css() }}
+				</fieldset>
+				<fieldset class="actions">
+					<input type="submit" value="Log in" />{% for item in query %}
+					<input type="hidden" name="{{ item.0 }}" value="{{ item.1 }}" />{% endfor %}
+				</fieldset>
+			</form>
+{% endblock %}

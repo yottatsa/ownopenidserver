@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+import os, os.path
+import urlparse
+import urllib
+
+import web, web.http, web.form, web.session, web.contrib.template
+
+import openid.server.server, openid.store.filestore
+
 
 class TrustRootStore(object):
     """
@@ -8,8 +16,6 @@ class TrustRootStore(object):
 
 
     def __init__(self, directory):
-        import os, os.path
-
         self.directory = directory
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
@@ -20,9 +26,6 @@ class TrustRootStore(object):
         Encode url to filename
         TODO: doctest
         """
-        import urlparse
-        import urllib
-        import os.path
 
         url = urlparse.urlparse(url)
         filename = urllib.quote('__'.join(tuple(url)).replace('/', '_'))
@@ -31,12 +34,10 @@ class TrustRootStore(object):
 
 
     def add(self, url):
-        import os
         return os.symlink(url, self._get_filename(url))
 
 
     def check(self, url):
-        import os.path
         return os.path.lexists(self._get_filename(url))
 
 
@@ -145,7 +146,6 @@ class OpenIDResponse(object):
         return self._encode_response(self.request.answer(allow=False))
 
 
-
 class OpenIDServer(object):
     """
     Manage OpenID server and trust root store, emit response
@@ -158,6 +158,31 @@ class OpenIDServer(object):
 
     def request(self, query):
         return OpenIDResponse(self, query)
+
+
+class PasswordChecker(object):
+    """
+    Check password
+    """
+
+
+    def __init__(self, directory):
+        self.directory = directory
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory)
+
+
+    def _get_filename(self):
+        return os.path.join(self.directory, 'password')
+
+    def check(self, password):
+        try:
+            file = open(self._get_filename(), 'rb+')
+            if unicode(file.read().strip()) == unicode(password):
+                return True
+        except:
+            pass
+        return False
 
 
 def render_openid_to_response(response):
@@ -180,8 +205,63 @@ class WebOpenIDIndex(object):
     def GET(self):
         web.header('Content-type', 'text/html')
         return render.base(
+                logged_in=session.get('logged_in', False),
                 endpoint=server.openid.op_endpoint,
                 yadis=web.ctx.homedomain + web.url('/yadis.xrds'),
+            )
+
+
+def WebOpenIDLoginRequired():
+    query = dict(web.input())
+    query['return_to'] = web.ctx.homedomain + web.url(web.ctx.path)
+    return web.found(web.ctx.homedomain + web.url('/login/', **query))
+
+
+def WebOpenIDLoginForm(callback):
+    return web.form.Form(
+            web.form.Password("password",
+                web.form.notnull,
+                web.form.Validator('Incorrect', callback),
+                description="Password: ",
+            ),
+        )
+
+
+class WebOpenIDLogin(object):
+
+
+    def GET(self):
+        query = web.input()
+
+        form = WebOpenIDLoginForm(lambda password: False)()
+
+        web.header('Content-type', 'text/html')
+        return render.login(
+                logged_in=session.get('logged_in', False),
+                form=form,
+                query=query.items(),
+            )
+
+
+    def POST(self):
+        query = web.input()
+
+        return_to = query.get('return_to', web.ctx.homedomain + web.url('/'))
+
+        data = filter(lambda item: item[0] not in ['password'], query.items())
+
+        form = WebOpenIDLoginForm(password_checker.check)()
+
+        if form.validates(query):
+            session['logged_in'] = True
+
+            return web.found(return_to + '?' + web.http.urlencode(dict(data)))
+
+        web.header('Content-type', 'text/html')
+        return render.login(
+                logged_in=session.get('logged_in', False),
+                form=form,
+                query=data,
             )
 
 
@@ -213,8 +293,11 @@ class WebOpenIDEndpoint(object):
         return self.endpoint()
 
 
-    def endpoint(self, logged_in=False):
+    def endpoint(self):
         query = web.input()
+
+        # check for login
+        logged_in = session.get('logged_in', False)
 
         request = server.request(query)
         try:
@@ -224,21 +307,14 @@ class WebOpenIDEndpoint(object):
             return web.badrequest()
 
         except OpenIDResponse.LogInNeed:
-            # redirect request to restricted area
-            return web.found(web.ctx.homedomain + web.url('/private/endpoint/', **dict(query)))
+            # redirect request login form
+            return WebOpenIDLoginRequired()
 
         except OpenIDResponse.DecisionNeed:
             # redirect request to decision page in restricted area
-            return web.found(web.ctx.homedomain + web.url('/private/decision/', **dict(query)))
+            return web.found(web.ctx.homedomain + web.url('/decision/', **query))
 
         return render_openid_to_response(response)
-
-
-class WebOpenIDPrivateEndpoint(WebOpenIDEndpoint):
-
-
-    def endpoint(self):
-        return super(WebOpenIDPrivateEndpoint, self).endpoint(logged_in=True)
 
 
 class WebOpenIDDecision(object):
@@ -246,6 +322,12 @@ class WebOpenIDDecision(object):
 
     def GET(self):
         query = web.input()
+
+        # check for login
+        logged_in = session.get('logged_in', False)
+
+        if not logged_in:
+            return WebOpenIDLoginRequired()
 
         request = server.request(query)
 
@@ -258,6 +340,7 @@ class WebOpenIDDecision(object):
         except OpenIDResponse.DecisionNeed:
             web.header('Content-type', 'text/html')
             return render.verify(
+                    logged_in=logged_in,
                     identity=request.request.identity,
                     trust_root=request.request.trust_root,
                     query=dict(query).items(),
@@ -269,6 +352,12 @@ class WebOpenIDDecision(object):
 
     def POST(self):
         query = web.input()
+
+        # check for login
+        logged_in = session.get('logged_in', False)
+
+        if not logged_in:
+            return WebOpenIDLoginRequired()
 
         request = server.request(query)
 
@@ -289,34 +378,33 @@ class WebOpenIDDecision(object):
         return render_openid_to_response(response)
 
 
-if __name__ == '__main__':
-    import os
-
-    import openid.store.filestore
-    import openid.server.server
-
-    import web
-    import web.contrib.template
-
-    urls = (
+app = web.application(
+        (
             '/', 'WebOpenIDIndex',
-            '/private/', 'WebOpenIDIndex',
+            '/login/', 'WebOpenIDLogin',
             '/yadis.xrds', 'WebOpenIDYadis',
             '/endpoint/', 'WebOpenIDEndpoint',
-            '/private/endpoint/', 'WebOpenIDPrivateEndpoint',
-            '/private/decision/', 'WebOpenIDDecision',
-        )
+            '/decision/', 'WebOpenIDDecision',
+        ),
+        globals()
+    )
 
-    app = web.application(urls, globals())
-    app.load(os.environ)
+openid_store = openid.store.filestore.FileOpenIDStore('sstore')
 
-    openid_store = openid.store.filestore.FileOpenIDStore('sstore')
+trust_root_store = TrustRootStore('sstore/trust_root')
+
+sessions_store = web.session.DiskStore('sstore/sessions')
+session = web.session.Session(app, sessions_store)
+
+password_checker = PasswordChecker('sstore')
+
+render = web.contrib.template.render_jinja('templates')
+
+
+if __name__ == '__main__':
+    #app.load(os.environ)
     openid_server = openid.server.server.Server(openid_store,
-            web.ctx.homedomain + web.url('/endpoint/'))
-    trust_root_store = TrustRootStore('sstore/trust_root')
-
+            "http://127.0.0.1:8080/endpoint/")
+            #web.ctx.homedomain + web.url('/endpoint/'))
     server = OpenIDServer(openid_server, trust_root_store)
-
-    render = web.contrib.template.render_jinja('.')
-
     app.run()

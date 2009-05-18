@@ -10,9 +10,11 @@
 			<form method="post" action=".">
 				<p>Verify your identity to the relying party?</p>
 
-				<input type="submit" value="Yes (Allow)" name="approve" />
-				<input type="submit" value="Always (Allow)" name="always" />
-				<input type="submit" value="No (Cancel)" name="decline" />{% for item in query %}
-				<input type="hidden" name="{{ item.0 }}" value="{{ item.1 }}" />{% endfor %}
+				<fieldset class="actions">
+					<input type="submit" value="Yes (Allow)" name="approve" />
+					<input type="submit" value="Always (Allow)" name="always" />
+					<input type="submit" value="No (Cancel)" name="decline" />{% for item in query %}
+					<input type="hidden" name="{{ item.0 }}" value="{{ item.1 }}" />{% endfor %}
+				</fieldset>
 			</form>
 {% endblock %}

@@ -35,7 +35,7 @@
 				border-bottom: 0.2em solid #3465A4;
 			}
 
-			#identity {
+			#loggedin {
 				display: block;
 				float: right; 
 
@@ -44,7 +44,7 @@
 				font-size: 1.1em;
 			}
 
-			h1, #identity, #identity a {
+			h1, #loggedin {
 				color: #EEEEEC;
 			}
 
@@ -52,13 +52,35 @@
 				background-color: #FCE94F;
 			}
 
+			form {
+				padding: 1em 2em;
+
+				border: 0.2em solid #D3D7CF;
+			}
+
+			fieldset {
+				margin: 0.5em 0;
+
+				border: none;
+			}
+
+			fieldset.actions {
+				border-top: 0.2em solid #555753;
+			}
+
+			fieldset strong.wrong {
+				display: block;
+
+				color: #EF2929;
+			}
+
 		</style>
 	</head>
     <body>
-		<h1>OpenID Server</h1>{% if identity is defined %}
+		<h1>OpenID Server</h1>{% if logged_in==True %}
 
-		<p id="identity">You identity: <a href="{{ identity|escape }}">{{ identity|escape }}</a></p>{% endif %}
-		
+		<p id="loggedin">Logged in</p>{% endif %}
+
 		<div id="main">
 {% block content %}
 			<h2>Home</h2>

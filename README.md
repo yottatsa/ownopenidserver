@@ -6,7 +6,8 @@ ownopenidserver
 
 Usage
 -----
-Just drop openidserver.py with templates to cgi-bin directory and tune your index.html
+Just drop openidserver.py with templates to cgi-bin directory, tune your index.html
+and set you password stored into `sstore/password' file.
 
 Plan
 ----
