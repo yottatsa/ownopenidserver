@@ -369,15 +369,15 @@ class WebOpenIDChangePassword(object):
         if form.validates(query):
             password_manager.set(query['password'])
 
-            return web.found(web.url('/account/'))
+            return web.found(web.ctx.homedomain + web.url('/account/'))
 
+        web.header('Content-type', 'text/html')
         return render.password(
                 logged_in=session.get('logged_in', False),
                 logout_url=web.ctx.homedomain + web.url('/account/logout/'),
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
                 form=form,
             )
-
 
 
 class WebOpenIDYadis(object):
