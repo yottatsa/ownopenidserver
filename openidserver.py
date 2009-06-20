@@ -528,9 +528,8 @@ render = web.contrib.template.render_jinja(TEMPLATES)
 
 if __name__ == '__main__':
     web.config.debug = False
-    #app.load(os.environ)
+    app.load(os.environ)
     openid_server = openid.server.server.Server(openid_store,
-            'http://127.0.0.1:8080/endpoint/')
-            #web.ctx.homedomain + web.url('/endpoint/'))
+            web.ctx.homedomain + web.url('/endpoint/'))
     server = OpenIDServer(openid_server, trust_root_store)
     app.run()
