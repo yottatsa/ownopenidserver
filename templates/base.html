@@ -16,8 +16,12 @@
 			        color: #2E3436;
 			}
 
-			a {
+			a, #loggedin a:hover {
 				color: #3465A4;
+			}
+
+			tt, a:hover {
+				background-color: #FCE94F;
 			}
 
 			h1, #main {
@@ -45,12 +49,8 @@
 				font-size: 1.1em;
 			}
 
-			h1, #loggedin {
+			h1, #loggedin, #loggedin a {
 				color: #EEEEEC;
-			}
-
-			tt {
-				background-color: #FCE94F;
 			}
 
 			form {
@@ -81,11 +81,15 @@
     <body>
 		<h1>OpenID Server</h1>{% if logged_in==True %}
 
-		<p id="loggedin">Logged in</p>{% endif %}
+		<p id="loggedin">Logged in. <a href="{{ logout_url }}">Log out</a>, <a href="{{ change_password_url }}">Change password</a>.</p>{% endif %}
 
 		<div id="main">
-{% block content %}
+{% block content %}{% if logged_in==True %}
 			<h2>Home</h2>
+
+			<p>Hello, I'am your own OpenID server and I'am work for you, my master.</p>
+			<p>Now you may confirm your authority with my help, <a href="{{ logout_url }}">log out from here</a> or <a href="{{ change_password_url }}">change access password</a>.</p>{% else %}
+			{% endif %}
 {% endblock %}
 		</div>
 	</body>

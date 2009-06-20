@@ -1,8 +1,13 @@
 #!/usr/bin/env python
 
+ROOT_STORE = 'sstore'
+TEMPLATES = 'templates'
+
+
 import os, os.path
 import urlparse
 import urllib
+import md5, sys, random
 
 import web, web.http, web.form, web.session, web.contrib.template
 
@@ -160,11 +165,10 @@ class OpenIDServer(object):
         return OpenIDResponse(self, query)
 
 
-class PasswordChecker(object):
+class PasswordManager(object):
     """
-    Check password
+    Manage access password
     """
-
 
     def __init__(self, directory):
         self.directory = directory
@@ -175,14 +179,49 @@ class PasswordChecker(object):
     def _get_filename(self):
         return os.path.join(self.directory, 'password')
 
+
+    def _generate_hash(self, salt, password):
+        """
+        build hash as md5 of concat of salt and password
+        """
+        return md5.md5(''.join([salt, str(password)])).hexdigest()
+
+
     def check(self, password):
+        """
+        Check password. Return False if passwords don't match, else return True if
+        passwords match or unavailable
+        """
         try:
             file = open(self._get_filename(), 'rb+')
-            if unicode(file.read().strip()) == unicode(password):
-                return True
+
+            # read salt and hash splitted by '$' from password file
+            salt, hash = file.read().strip().split('$', 1)
+
+            file.close()
+
+            # build hash and compare with stored
+            if not self._generate_hash(salt, password) == hash:
+                return False
         except:
             pass
-        return False
+        return True
+
+
+    def set(self, password):
+        """
+        Set password
+        """
+        try:
+            file = open(self._get_filename(), 'wb+')
+            salt = str(random.randint(1, sys.maxint))
+
+            file.write('$'.join([salt, self._generate_hash(salt, password)]))
+
+            file.close()
+            return True
+        except:
+            raise
 
 
 def render_openid_to_response(response):
@@ -206,6 +245,8 @@ class WebOpenIDIndex(object):
         web.header('Content-type', 'text/html')
         return render.base(
                 logged_in=session.get('logged_in', False),
+                logout_url=web.ctx.homedomain + web.url('/account/logout/'),
+                change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
                 endpoint=server.openid.op_endpoint,
                 yadis=web.ctx.homedomain + web.url('/yadis.xrds'),
             )
@@ -214,13 +255,12 @@ class WebOpenIDIndex(object):
 def WebOpenIDLoginRequired():
     query = dict(web.input())
     query['return_to'] = web.ctx.homedomain + web.url(web.ctx.path)
-    return web.found(web.ctx.homedomain + web.url('/login/', **query))
+    return web.found(web.ctx.homedomain + web.url('/account/login/', **query))
 
 
 def WebOpenIDLoginForm(callback):
     return web.form.Form(
             web.form.Password("password",
-                web.form.notnull,
                 web.form.Validator('Incorrect', callback),
                 description="Password: ",
             ),
@@ -238,6 +278,8 @@ class WebOpenIDLogin(object):
         web.header('Content-type', 'text/html')
         return render.login(
                 logged_in=session.get('logged_in', False),
+                logout_url=web.ctx.homedomain + web.url('/account/logout/'),
+                change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
                 form=form,
                 query=query.items(),
             )
@@ -246,11 +288,12 @@ class WebOpenIDLogin(object):
     def POST(self):
         query = web.input()
 
-        return_to = query.get('return_to', web.ctx.homedomain + web.url('/'))
+        return_to = query.get('return_to',
+                web.ctx.homedomain + web.url('/account/'))
 
         data = filter(lambda item: item[0] not in ['password'], query.items())
 
-        form = WebOpenIDLoginForm(password_checker.check)()
+        form = WebOpenIDLoginForm(password_manager.check)()
 
         if form.validates(query):
             session['logged_in'] = True
@@ -260,9 +303,81 @@ class WebOpenIDLogin(object):
         web.header('Content-type', 'text/html')
         return render.login(
                 logged_in=session.get('logged_in', False),
+                logout_url=web.ctx.homedomain + web.url('/account/logout/'),
+                change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
                 form=form,
                 query=data,
             )
+
+
+class WebOpenIDLogout(object):
+
+
+    def GET(self):
+        session['logged_in'] = False
+        return web.found(web.ctx.homedomain + web.url('/account/login/'))
+
+
+WebOpenIDChangePasswordForm = web.form.Form(
+            web.form.Password("password",
+                web.form.notnull,
+                description="Password: ",
+            ),
+            web.form.Password("confirm",
+                web.form.notnull,
+                description="Retype: ",
+            ),
+            validators=[
+                    web.form.Validator('Passwords did not match',
+                        lambda source: source['password'] == source['confirm']),
+                ],
+        )
+
+
+class WebOpenIDChangePassword(object):
+
+
+    def GET(self):
+        # check for login
+        logged_in = session.get('logged_in', False)
+
+        if not logged_in:
+            return WebOpenIDLoginRequired()
+
+        form = WebOpenIDChangePasswordForm()
+
+        web.header('Content-type', 'text/html')
+        return render.password(
+                logged_in=session.get('logged_in', False),
+                logout_url=web.ctx.homedomain + web.url('/account/logout/'),
+                change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
+                form=form,
+            )
+
+
+    def POST(self):
+        # check for login
+        logged_in = session.get('logged_in', False)
+
+        if not logged_in:
+            return WebOpenIDLoginRequired()
+
+        query = web.input()
+
+        form = WebOpenIDChangePasswordForm()
+
+        if form.validates(query):
+            password_manager.set(query['password'])
+
+            return web.found(web.url('/account/'))
+
+        return render.password(
+                logged_in=session.get('logged_in', False),
+                logout_url=web.ctx.homedomain + web.url('/account/logout/'),
+                change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
+                form=form,
+            )
+
 
 
 class WebOpenIDYadis(object):
@@ -341,6 +456,8 @@ class WebOpenIDDecision(object):
             web.header('Content-type', 'text/html')
             return render.verify(
                     logged_in=logged_in,
+                    logout_url=web.ctx.homedomain + web.url('/account/logout/'),
+                    change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
                     identity=request.request.identity,
                     trust_root=request.request.trust_root,
                     query=dict(query).items(),
@@ -381,7 +498,10 @@ class WebOpenIDDecision(object):
 app = web.application(
         (
             '/', 'WebOpenIDIndex',
-            '/login/', 'WebOpenIDLogin',
+            '/account/', 'WebOpenIDIndex',
+            '/account/login/', 'WebOpenIDLogin',
+            '/account/logout/', 'WebOpenIDLogout',
+            '/account/change_password/', 'WebOpenIDChangePassword',
             '/yadis.xrds', 'WebOpenIDYadis',
             '/endpoint/', 'WebOpenIDEndpoint',
             '/decision/', 'WebOpenIDDecision',
@@ -389,22 +509,28 @@ app = web.application(
         globals()
     )
 
-openid_store = openid.store.filestore.FileOpenIDStore('sstore')
 
-trust_root_store = TrustRootStore('sstore/trust_root')
+TRUST_ROOT_STORE = os.path.join(ROOT_STORE, 'trust_root')
+SESSION_STORE = os.path.join(ROOT_STORE, 'sessions')
+PASSWORD_STORE = ROOT_STORE
 
-sessions_store = web.session.DiskStore('sstore/sessions')
+openid_store = openid.store.filestore.FileOpenIDStore(ROOT_STORE)
+
+trust_root_store = TrustRootStore(TRUST_ROOT_STORE)
+
+sessions_store = web.session.DiskStore(SESSION_STORE)
 session = web.session.Session(app, sessions_store)
 
-password_checker = PasswordChecker('sstore')
+password_manager = PasswordManager(PASSWORD_STORE)
 
-render = web.contrib.template.render_jinja('templates')
+render = web.contrib.template.render_jinja(TEMPLATES)
 
 
 if __name__ == '__main__':
     web.config.debug = False
-    app.load(os.environ)
+    #app.load(os.environ)
     openid_server = openid.server.server.Server(openid_store,
-            web.ctx.homedomain + web.url('/endpoint/'))
+            'http://127.0.0.1:8080/endpoint/')
+            #web.ctx.homedomain + web.url('/endpoint/'))
     server = OpenIDServer(openid_server, trust_root_store)
     app.run()
