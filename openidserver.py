@@ -242,8 +242,8 @@ class WebOpenIDIndex(object):
         web.header('Content-type', 'text/html')
         return render.base(
                 logged_in=session.get('logged_in', False),
-                logout_url=web.ctx.homedomain + web.url('/account/logout/'),
-                change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
+                logout_url=web.ctx.homedomain + web.url('/account/logout'),
+                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
                 endpoint=server.openid.op_endpoint,
                 yadis=web.ctx.homedomain + web.url('/yadis.xrds'),
             )
@@ -252,7 +252,7 @@ class WebOpenIDIndex(object):
 def WebOpenIDLoginRequired():
     query = dict(web.input())
     query['return_to'] = web.ctx.homedomain + web.url(web.ctx.path)
-    return web.found(web.ctx.homedomain + web.url('/account/login/', **query))
+    return web.found(web.ctx.homedomain + web.url('/account/login', **query))
 
 
 def WebOpenIDLoginForm(callback):
@@ -275,8 +275,9 @@ class WebOpenIDLogin(object):
         web.header('Content-type', 'text/html')
         return render.login(
                 logged_in=session.get('logged_in', False),
-                logout_url=web.ctx.homedomain + web.url('/account/logout/'),
-                change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
+                login_url=web.ctx.homedomain + web.url('/account/login'),
+                logout_url=web.ctx.homedomain + web.url('/account/logout'),
+                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
                 form=form,
                 query=query.items(),
             )
@@ -286,7 +287,7 @@ class WebOpenIDLogin(object):
         query = web.input()
 
         return_to = query.get('return_to',
-                web.ctx.homedomain + web.url('/account/'))
+                web.ctx.homedomain + web.url('/account'))
 
         data = filter(lambda item: item[0] not in ['password'], query.items())
 
@@ -300,8 +301,9 @@ class WebOpenIDLogin(object):
         web.header('Content-type', 'text/html')
         return render.login(
                 logged_in=session.get('logged_in', False),
-                logout_url=web.ctx.homedomain + web.url('/account/logout/'),
-                change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
+                login_url=web.ctx.homedomain + web.url('/account/login'),
+                logout_url=web.ctx.homedomain + web.url('/account/logout'),
+                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
                 form=form,
                 query=data,
             )
@@ -312,7 +314,7 @@ class WebOpenIDLogout(object):
 
     def GET(self):
         session['logged_in'] = False
-        return web.found(web.ctx.homedomain + web.url('/account/login/'))
+        return web.found(web.ctx.homedomain + web.url('/account/login'))
 
 
 WebOpenIDChangePasswordForm = web.form.Form(
@@ -346,8 +348,8 @@ class WebOpenIDChangePassword(object):
         web.header('Content-type', 'text/html')
         return render.password(
                 logged_in=session.get('logged_in', False),
-                logout_url=web.ctx.homedomain + web.url('/account/logout/'),
-                change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
+                logout_url=web.ctx.homedomain + web.url('/account/logout'),
+                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
                 form=form,
             )
 
@@ -366,13 +368,13 @@ class WebOpenIDChangePassword(object):
         if form.validates(query):
             password_manager.set(query['password'])
 
-            return web.found(web.ctx.homedomain + web.url('/account/'))
+            return web.found(web.ctx.homedomain + web.url('/account'))
 
         web.header('Content-type', 'text/html')
         return render.password(
                 logged_in=session.get('logged_in', False),
-                logout_url=web.ctx.homedomain + web.url('/account/logout/'),
-                change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
+                logout_url=web.ctx.homedomain + web.url('/account/logout'),
+                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
                 form=form,
             )
 
@@ -424,7 +426,7 @@ class WebOpenIDEndpoint(object):
 
         except OpenIDResponse.DecisionNeed:
             # redirect request to decision page in restricted area
-            return web.found(web.ctx.homedomain + web.url('/decision/', **query))
+            return web.found(web.ctx.homedomain + web.url('/account/decision', **query))
 
         return render_openid_to_response(response)
 
@@ -453,8 +455,9 @@ class WebOpenIDDecision(object):
             web.header('Content-type', 'text/html')
             return render.verify(
                     logged_in=logged_in,
-                    logout_url=web.ctx.homedomain + web.url('/account/logout/'),
-                    change_password_url=web.ctx.homedomain + web.url('/account/change_password/'),
+                    logout_url=web.ctx.homedomain + web.url('/account/logout'),
+                    change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                    decision_url=web.ctx.homedomain + web.url('/account/decision'),
                     identity=request.request.identity,
                     trust_root=request.request.trust_root,
                     query=dict(query).items(),
@@ -494,14 +497,13 @@ class WebOpenIDDecision(object):
 
 app = web.application(
         (
-            '/', 'WebOpenIDIndex',
-            '/account/', 'WebOpenIDIndex',
-            '/account/login/', 'WebOpenIDLogin',
-            '/account/logout/', 'WebOpenIDLogout',
-            '/account/change_password/', 'WebOpenIDChangePassword',
+            '/account', 'WebOpenIDIndex',
+            '/account/login', 'WebOpenIDLogin',
+            '/account/logout', 'WebOpenIDLogout',
+            '/account/change_password', 'WebOpenIDChangePassword',
             '/yadis.xrds', 'WebOpenIDYadis',
-            '/endpoint/', 'WebOpenIDEndpoint',
-            '/decision/', 'WebOpenIDDecision',
+            '/endpoint', 'WebOpenIDEndpoint',
+            '/account/decision', 'WebOpenIDDecision',
         ),
         globals()
     )
@@ -534,8 +536,9 @@ render = web.contrib.template.render_jinja(TEMPLATES)
 
 if __name__ == '__main__':
     web.config.debug = False
+    environ = os.environ
     app.load(os.environ)
     openid_server = openid.server.server.Server(openid_store,
-            web.ctx.homedomain + web.url('/endpoint/'))
+            web.ctx.homedomain + web.url('/endpoint'))
     server = OpenIDServer(openid_server, trust_root_store)
     app.run()
