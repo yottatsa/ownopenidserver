@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 
-ROOT_STORE = 'sstore'
-TEMPLATES = 'templates'
-
 
 import os, os.path
 import urlparse
@@ -510,9 +507,18 @@ app = web.application(
     )
 
 
+ROOT_STORE = 'sstore'
+TEMPLATES = 'templates'
+
 TRUST_ROOT_STORE = os.path.join(ROOT_STORE, 'trust_root')
 SESSION_STORE = os.path.join(ROOT_STORE, 'sessions')
 PASSWORD_STORE = ROOT_STORE
+
+
+try:
+    from localsettings import *
+except ImportError: pass
+
 
 openid_store = openid.store.filestore.FileOpenIDStore(ROOT_STORE)
 
