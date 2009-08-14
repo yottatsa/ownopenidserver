@@ -162,15 +162,20 @@ class OpenIDServer(object):
         return OpenIDResponse(self, query)
 
 
-class PasswordManager(object):
+class PasswordManager(web.form.Validator):
     """
     Manage access password
     """
+
+    class NoPassword(Exception):
+        pass
 
     def __init__(self, directory):
         self.directory = directory
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
+
+        self.msg = 'Invalid password'
 
 
     def _get_filename(self):
@@ -184,7 +189,7 @@ class PasswordManager(object):
         return md5.md5(''.join([salt, str(password)])).hexdigest()
 
 
-    def check(self, password):
+    def valid(self, password):
         """
         Check password. Return False if passwords don't match, else return True if
         passwords match or unavailable
@@ -200,8 +205,10 @@ class PasswordManager(object):
             # build hash and compare with stored
             if not self._generate_hash(salt, password) == hash:
                 return False
+
         except:
-            pass
+            raise PasswordManager.NoPassword
+
         return True
 
 
@@ -244,6 +251,7 @@ class WebOpenIDIndex(object):
                 logged_in=session.get('logged_in', False),
                 logout_url=web.ctx.homedomain + web.url('/account/logout'),
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                no_password=session.get('no_password', False),
                 endpoint=server.openid.op_endpoint,
                 yadis=web.ctx.homedomain + web.url('/yadis.xrds'),
             )
@@ -255,10 +263,10 @@ def WebOpenIDLoginRequired():
     return web.found(web.ctx.homedomain + web.url('/account/login', **query))
 
 
-def WebOpenIDLoginForm(callback):
+def WebOpenIDLoginForm(validator):
     return web.form.Form(
             web.form.Password("password",
-                web.form.Validator('Incorrect', callback),
+                validator,
                 description="Password: ",
             ),
         )
@@ -270,7 +278,7 @@ class WebOpenIDLogin(object):
     def GET(self):
         query = web.input()
 
-        form = WebOpenIDLoginForm(lambda password: False)()
+        form = WebOpenIDLoginForm(web.form.notnull)()
 
         web.header('Content-type', 'text/html')
         return render.login(
@@ -278,6 +286,7 @@ class WebOpenIDLogin(object):
                 login_url=web.ctx.homedomain + web.url('/account/login'),
                 logout_url=web.ctx.homedomain + web.url('/account/logout'),
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                no_password=session.get('no_password', False),
                 form=form,
                 query=query.items(),
             )
@@ -291,22 +300,30 @@ class WebOpenIDLogin(object):
 
         data = filter(lambda item: item[0] not in ['password'], query.items())
 
-        form = WebOpenIDLoginForm(password_manager.check)()
+        form = WebOpenIDLoginForm(password_manager)()
 
-        if form.validates(query):
-            session['logged_in'] = True
+        try:
+            if not form.validates(query):
+                web.header('Content-type', 'text/html')
+                return render.login(
+                        logged_in=session.get('logged_in', False),
+                        login_url=web.ctx.homedomain + web.url('/account/login'),
+                        logout_url=web.ctx.homedomain + web.url('/account/logout'),
+                        change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                        no_password=session.get('no_password', False),
+                        form=form,
+                        query=data,
+                    )
 
-            return web.found(return_to + '?' + web.http.urlencode(dict(data)))
+        except PasswordManager.NoPassword:
+            session['no_password'] = True
 
-        web.header('Content-type', 'text/html')
-        return render.login(
-                logged_in=session.get('logged_in', False),
-                login_url=web.ctx.homedomain + web.url('/account/login'),
-                logout_url=web.ctx.homedomain + web.url('/account/logout'),
-                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
-                form=form,
-                query=data,
-            )
+        except: raise
+
+
+        session['logged_in'] = True
+
+        return web.found(return_to + '?' + web.http.urlencode(dict(data)))
 
 
 class WebOpenIDLogout(object):
@@ -350,6 +367,7 @@ class WebOpenIDChangePassword(object):
                 logged_in=session.get('logged_in', False),
                 logout_url=web.ctx.homedomain + web.url('/account/logout'),
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                no_password=session.get('no_password', False),
                 form=form,
             )
 
@@ -368,6 +386,8 @@ class WebOpenIDChangePassword(object):
         if form.validates(query):
             password_manager.set(query['password'])
 
+            session['no_password'] = False
+
             return web.found(web.ctx.homedomain + web.url('/account'))
 
         web.header('Content-type', 'text/html')
@@ -375,6 +395,7 @@ class WebOpenIDChangePassword(object):
                 logged_in=session.get('logged_in', False),
                 logout_url=web.ctx.homedomain + web.url('/account/logout'),
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                no_password=session.get('no_password', False),
                 form=form,
             )
 
@@ -457,6 +478,7 @@ class WebOpenIDDecision(object):
                     logged_in=logged_in,
                     logout_url=web.ctx.homedomain + web.url('/account/logout'),
                     change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                    no_password=session.get('no_password', False),
                     decision_url=web.ctx.homedomain + web.url('/account/decision'),
                     identity=request.request.identity,
                     trust_root=request.request.trust_root,

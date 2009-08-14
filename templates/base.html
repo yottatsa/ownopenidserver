@@ -20,7 +20,7 @@
 				color: #3465A4;
 			}
 
-			tt, a:hover {
+			tt, a:hover, #main p.message {
 				background-color: #FCE94F;
 			}
 
@@ -52,10 +52,22 @@
 			h1, #loggedin, #loggedin a {
 				color: #EEEEEC;
 			}
-
-			form {
+			
+			#main p, #main form {
+				background-color: #FFFFFF;
+				
+				margin-left: -2em; margin-right: -2em;
 				padding: 1em 2em;
 
+				-moz-border-radius: 0.5em;
+				-webkit-border-radius: 0.5em;
+			}
+
+			#main p {
+				border: 0.2em solid #FFFFFF;
+			}
+
+			#main form {
 				border: 0.2em solid #D3D7CF;
 			}
 
@@ -66,6 +78,8 @@
 			}
 
 			fieldset.actions {
+				margin-top: 1em;
+
 				border-top: 0.2em solid #555753;
 			}
 
@@ -83,10 +97,11 @@
 
 		<p id="loggedin">Logged in. <a href="{{ logout_url }}">Log out</a>, <a href="{{ change_password_url }}">Change password</a>.</p>{% endif %}
 
-		<div id="main">
-{% block content %}{% if logged_in==True %}
-			<h2>Home</h2>
+		<div id="main">{% if logged_in==True and no_password==True %}
 
+			<p class="message">First of all you need to <a href="{{ change_password_url }}">set up you access password</a>.</p>{% endif %}{% block content %}{% if logged_in==True %}
+
+			<h2>Home</h2>
 			<p>Hello, I'am your own OpenID server and I'am work for you, my master.</p>
 			<p>Now you may confirm your authority with my help, <a href="{{ logout_url }}">log out from here</a> or <a href="{{ change_password_url }}">change access password</a>.</p>{% else %}
 			{% endif %}
