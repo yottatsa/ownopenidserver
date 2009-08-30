@@ -1,8 +1,8 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 	<head>{% if endpoint is defined and yadis is defined %}
-		<link rel="openid.server" href="{{ endpoint|escape }}">
-		<meta http-equiv="x-xrds-location" content="{{ yadis|escape }}">{% endif %}
+		<link rel="openid.server" href="{{ endpoint|escape }}" />
+		<meta http-equiv="x-xrds-location" content="{{ yadis|escape }}" />{% endif %}
 {% block head %}
 		<title>{% block title %}Home{% endblock %} - OpenID Server</title>
 		<style type="text/css">
