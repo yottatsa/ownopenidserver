@@ -1,3 +1,7 @@
+# work files
 *.pyc
 .*.swp
-localsettings.py
+
+# setuptools temp files
+build
+dist
