@@ -1,6 +1,31 @@
 #!/usr/bin/python
 
+import os, os.path
 import sys
+import pwd
+
+
+from openidserver import localsettings
+
+uid, gid = pwd.getpwnam(sys.argv[1])[2:4]
+
+if not os.path.exists(localsettings.ROOT_STORE):
+    os.makedirs(localsettings.ROOT_STORE, mode=0750)
+os.chown(localsettings.ROOT_STORE, uid, gid)
+
+if not os.path.exists(localsettings.TRUST_ROOT_STORE):
+    os.makedirs(localsettings.TRUST_ROOT_STORE, mode=0750)
+os.chown(localsettings.TRUST_ROOT_STORE, uid, gid)
+
+if not os.path.exists(localsettings.PASSWORD_STORE):
+    os.makedirs(localsettings.PASSWORD_STORE, mode=0750)
+os.chown(localsettings.PASSWORD_STORE, uid, gid)
+
+
+os.setgid(gid)
+os.setuid(uid)
+
+
 from openidserver import openidserver
 
 password = sys.stdin.readline().strip()
