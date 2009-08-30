@@ -12,7 +12,7 @@ setup(
         package_dir={'openidserver': ''},
         packages=['openidserver'],
         data_files=[
-                ('/usr/share/openidserver', [
+                ('/usr/share/openidserver/templates', [
                         'templates/base.html',
                         'templates/login.html',
                         'templates/verify.html',

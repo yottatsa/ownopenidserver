@@ -558,7 +558,6 @@ render = web.contrib.template.render_jinja(TEMPLATES)
 
 if __name__ == '__main__':
     web.config.debug = False
-    environ = os.environ
     app.load(os.environ)
     openid_server = openid.server.server.Server(openid_store,
             web.ctx.homedomain + web.url('/endpoint'))

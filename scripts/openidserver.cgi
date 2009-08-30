@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 
-from openidserver import *
+from openidserver import openidserver
 
-web.config.debug = False
-environ = os.environ
-app.load(os.environ)
-openid_server = openid.server.server.Server(openid_store,
-        web.ctx.homedomain + web.url('/endpoint'))
-server = OpenIDServer(openid_server, trust_root_store)
-app.run()
+openidserver.web.config.debug = False
+openidserver.app.load(openidserver.os.environ)
+openidserver.openid_server = openidserver.openid.server.server.Server(
+        openidserver.openid_store,
+        openidserver.web.ctx.homedomain + openidserver.web.url('/endpoint')
+    )
+openidserver.server = openidserver.OpenIDServer(
+        openidserver.openid_server,
+        openidserver.trust_root_store
+    )
+openidserver.app.run()
