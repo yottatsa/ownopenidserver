@@ -1,0 +1,17 @@
+Source: openidserver
+Section: python
+Priority: extra
+Maintainer: Vladimir S Eremin <me@hidded.name>
+Build-Depends: cdbs, debhelper (>= 7)
+Standards-Version: 3.8.1
+XS-Python-Version: all
+XS-Vcs-Browser: http://github.com/hidded/ownopenidserver/
+XS-Vcs-git: git://github.com/hidded/ownopenidserver.git
+Homepage: http://github.com/hidded/ownopenidserver/
+
+Package: openidserver
+Architecture: any
+Depends: ${python:Depends}, python-webpy (>= 0.3), python-openid, python-jinja2, python-flup
+XB-Python-Version: ${python:Versions}
+Description: Own OpenID server
+ ownopenidserver is a small and very own OpenID server for you site.

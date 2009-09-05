@@ -4,4 +4,9 @@
 
 # setuptools temp files
 build
-dist
+
+# debian temp files
+debian/openidserver*
+debian/files
+debian/*.ex
+debian/python-module-stampdir
