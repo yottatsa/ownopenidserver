@@ -302,6 +302,8 @@ class WebOpenIDLogin(object):
 
         form = WebOpenIDLoginForm(password_manager)()
 
+        session['no_password'] = False
+
         try:
             if not form.validates(query):
                 web.header('Content-type', 'text/html')
