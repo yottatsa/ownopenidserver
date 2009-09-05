@@ -1,13 +1,32 @@
 #!/usr/bin/python
 
-import os, os.path
 import sys
-import pwd
+import optparse
 
+usage = 'Usage: %prog --username=www-data [--password]'
+
+parser = optparse.OptionParser(usage)
+parser.add_option('-u', '--username',
+        action='store', dest='username',
+        help='set owner\'s working directories username')
+parser.add_option('-p', '--password',
+        action='store_true', dest='set_password', default=False,
+        help='set access password (to stdin)')
+
+(options, _) = parser.parse_args(sys.argv[1:])
+
+
+if not options.username:
+    parser.print_help()
+    sys.exit(0)
+
+
+import os
+import pwd
 
 from openidserver import localsettings
 
-uid, gid = pwd.getpwnam(sys.argv[1])[2:4]
+uid, gid = pwd.getpwnam(options.username)[2:4]
 
 if not os.path.exists(localsettings.ROOT_STORE):
     os.makedirs(localsettings.ROOT_STORE, mode=0750)
@@ -22,11 +41,11 @@ if not os.path.exists(localsettings.PASSWORD_STORE):
 os.chown(localsettings.PASSWORD_STORE, uid, gid)
 
 
-os.setgid(gid)
-os.setuid(uid)
+if options.set_password:
+    os.setgid(gid)
+    os.setuid(uid)
 
+    from openidserver import openidserver
 
-from openidserver import openidserver
-
-password = sys.stdin.readline().strip()
-openidserver.password_manager.set(password)
+    password = sys.stdin.readline().strip()
+    openidserver.password_manager.set(password)

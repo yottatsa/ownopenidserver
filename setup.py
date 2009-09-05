@@ -4,7 +4,7 @@ from distutils.core import setup
 
 setup(
         name='openidserver',
-        author='Vladimir S Eremin aka hidded',
+        author='Vladimir S Eremin (aka hidded)',
         author_email='me@hidded.name',
         url='http://github.com/hidded/ownopenidserver/',
         version='0.1.0',
