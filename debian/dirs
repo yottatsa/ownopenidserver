@@ -1,3 +1,6 @@
 usr/bin
 usr/lib/cgi
 usr/share
+etc/openidserver
+var/lib/openidserver
+var/spool/openidserver
