@@ -541,9 +541,10 @@ SESSION_STORE = os.path.join(ROOT_STORE, 'sessions')
 PASSWORD_STORE = ROOT_STORE
 
 
-try:
-    from localsettings import *
-except ImportError: pass
+if __name__ != '__main__':
+    try:
+        from localsettings import *
+    except ImportError: pass
 
 
 openid_store = openid.store.filestore.FileOpenIDStore(ROOT_STORE)
@@ -559,8 +560,10 @@ render = web.contrib.template.render_jinja(TEMPLATES)
 
 
 if __name__ == '__main__':
-    web.config.debug = False
-    app.load(os.environ)
+    try:
+        app.load(os.environ)
+    except: pass
+    web.config.debug = True
     openid_server = openid.server.server.Server(openid_store,
             web.ctx.homedomain + web.url('/endpoint'))
     server = OpenIDServer(openid_server, trust_root_store)
