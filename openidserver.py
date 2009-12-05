@@ -446,7 +446,7 @@ class WebOpenIDDecision(WebHandler):
             if self.method == 'POST':
                 if self.query.has_key('approve'):
                     response = request.approve()
-                elif query.has_key('always'):
+                elif self.query.has_key('always'):
                     response = request.always()
                 else:
                     response = request.decline()
