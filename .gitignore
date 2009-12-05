@@ -1,6 +1,7 @@
 # work files
 *.pyc
 .*.swp
+sstore
 
 # setuptools temp files
 build

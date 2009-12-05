@@ -242,10 +242,32 @@ def render_openid_to_response(response):
         return web.HTTPError(str(response.code) + ' ', response.headers)
 
 
-class WebOpenIDIndex(object):
+class WebHandler(object):
+
+
+    def __init__(self):
+        self.query = web.input()
+        self.method = None
 
 
     def GET(self):
+        self.method = 'GET'
+        return self.request()
+
+
+    def POST(self):
+        self.method = 'POST'
+        return self.request()
+
+
+    def request(self):
+        raise NotImplemented
+
+
+class WebOpenIDIndex(WebHandler):
+
+
+    def request(self):
         web.header('Content-type', 'text/html')
         return render.base(
                 logged_in=session.get('logged_in', False),
@@ -257,8 +279,7 @@ class WebOpenIDIndex(object):
             )
 
 
-def WebOpenIDLoginRequired():
-    query = dict(web.input())
+def WebOpenIDLoginRequired(query):
     query['return_to'] = web.ctx.homedomain + web.url(web.ctx.path)
     return web.found(web.ctx.homedomain + web.url('/account/login', **query))
 
@@ -272,13 +293,28 @@ def WebOpenIDLoginForm(validator):
         )
 
 
-class WebOpenIDLogin(object):
+class WebOpenIDLogin(WebHandler):
 
 
-    def GET(self):
-        query = web.input()
+    def request(self):
+        return_to = self.query.get('return_to', web.ctx.homedomain + web.url('/account'))
 
-        form = WebOpenIDLoginForm(web.form.notnull)()
+        data = filter(lambda item: item[0] not in ['password'], self.query.items())
+
+        form = WebOpenIDLoginForm(password_manager)()
+
+        session['no_password'] = False
+
+        if self.method == 'POST':
+            try:
+                if form.validates(self.query):
+                    session['logged_in'] = True
+                    return web.found(return_to + '?' + web.http.urlencode(dict(data)))
+
+            except PasswordManager.NoPassword:
+                session['no_password'] = True
+                session['logged_in'] = True
+                return web.found(return_to + '?' + web.http.urlencode(dict(data)))
 
         web.header('Content-type', 'text/html')
         return render.login(
@@ -288,50 +324,14 @@ class WebOpenIDLogin(object):
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
                 no_password=session.get('no_password', False),
                 form=form,
-                query=query.items(),
+                query=data,
             )
 
 
-    def POST(self):
-        query = web.input()
-
-        return_to = query.get('return_to',
-                web.ctx.homedomain + web.url('/account'))
-
-        data = filter(lambda item: item[0] not in ['password'], query.items())
-
-        form = WebOpenIDLoginForm(password_manager)()
-
-        session['no_password'] = False
-
-        try:
-            if not form.validates(query):
-                web.header('Content-type', 'text/html')
-                return render.login(
-                        logged_in=session.get('logged_in', False),
-                        login_url=web.ctx.homedomain + web.url('/account/login'),
-                        logout_url=web.ctx.homedomain + web.url('/account/logout'),
-                        change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
-                        no_password=session.get('no_password', False),
-                        form=form,
-                        query=data,
-                    )
-
-        except PasswordManager.NoPassword:
-            session['no_password'] = True
-
-        except: raise
+class WebOpenIDLogout(WebHandler):
 
 
-        session['logged_in'] = True
-
-        return web.found(return_to + '?' + web.http.urlencode(dict(data)))
-
-
-class WebOpenIDLogout(object):
-
-
-    def GET(self):
+    def request(self):
         session['logged_in'] = False
         return web.found(web.ctx.homedomain + web.url('/account/login'))
 
@@ -352,17 +352,25 @@ WebOpenIDChangePasswordForm = web.form.Form(
         )
 
 
-class WebOpenIDChangePassword(object):
+class WebOpenIDChangePassword(WebHandler):
 
 
-    def GET(self):
+    def request(self):
         # check for login
         logged_in = session.get('logged_in', False)
 
         if not logged_in:
-            return WebOpenIDLoginRequired()
+            return WebOpenIDLoginRequired(self.query)
 
         form = WebOpenIDChangePasswordForm()
+
+        if self.method == 'POST':
+            if form.validates(self.query):
+                password_manager.set(self.query['password'])
+
+                session['no_password'] = False
+
+                return web.found(web.ctx.homedomain + web.url('/account'))
 
         web.header('Content-type', 'text/html')
         return render.password(
@@ -374,38 +382,10 @@ class WebOpenIDChangePassword(object):
             )
 
 
-    def POST(self):
-        # check for login
-        logged_in = session.get('logged_in', False)
-
-        if not logged_in:
-            return WebOpenIDLoginRequired()
-
-        query = web.input()
-
-        form = WebOpenIDChangePasswordForm()
-
-        if form.validates(query):
-            password_manager.set(query['password'])
-
-            session['no_password'] = False
-
-            return web.found(web.ctx.homedomain + web.url('/account'))
-
-        web.header('Content-type', 'text/html')
-        return render.password(
-                logged_in=session.get('logged_in', False),
-                logout_url=web.ctx.homedomain + web.url('/account/logout'),
-                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
-                no_password=session.get('no_password', False),
-                form=form,
-            )
+class WebOpenIDYadis(WebHandler):
 
 
-class WebOpenIDYadis(object):
-
-
-    def GET(self):
+    def request(self):
         import openid.consumer
         web.header('Content-type', 'application/xrds+xml')
         return """<?xml version="1.0" encoding="UTF-8"?>\n<xrds:XRDS \
@@ -419,24 +399,14 @@ class WebOpenIDYadis(object):
             )
 
 
-class WebOpenIDEndpoint(object):
+class WebOpenIDEndpoint(WebHandler):
 
 
-    def GET(self):
-        return self.endpoint()
-
-
-    def POST(self):
-        return self.endpoint()
-
-
-    def endpoint(self):
-        query = web.input()
-
+    def request(self):
         # check for login
         logged_in = session.get('logged_in', False)
 
-        request = server.request(query)
+        request = server.request(self.query)
         try:
             response = request.process(logged_in)
 
@@ -444,29 +414,27 @@ class WebOpenIDEndpoint(object):
             return web.badrequest()
 
         except OpenIDResponse.LogInNeed:
-            # redirect request login form
-            return WebOpenIDLoginRequired()
+            # redirect request to login form
+            return WebOpenIDLoginRequired(self.query)
 
         except OpenIDResponse.DecisionNeed:
             # redirect request to decision page in restricted area
-            return web.found(web.ctx.homedomain + web.url('/account/decision', **query))
+            return web.found(web.ctx.homedomain + web.url('/account/decision', **self.query))
 
         return render_openid_to_response(response)
 
 
-class WebOpenIDDecision(object):
+class WebOpenIDDecision(WebHandler):
 
 
-    def GET(self):
-        query = web.input()
-
+    def request(self):
         # check for login
         logged_in = session.get('logged_in', False)
 
         if not logged_in:
-            return WebOpenIDLoginRequired()
+            return WebOpenIDLoginRequired(self.query)
 
-        request = server.request(query)
+        request = server.request(self.query)
 
         try:
             response = request.process(logged_in=True)
@@ -475,46 +443,27 @@ class WebOpenIDDecision(object):
             return web.badrequest()
 
         except OpenIDResponse.DecisionNeed:
-            web.header('Content-type', 'text/html')
-            return render.verify(
-                    logged_in=logged_in,
-                    logout_url=web.ctx.homedomain + web.url('/account/logout'),
-                    change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
-                    no_password=session.get('no_password', False),
-                    decision_url=web.ctx.homedomain + web.url('/account/decision'),
-                    identity=request.request.identity,
-                    trust_root=request.request.trust_root,
-                    query=dict(query).items(),
-
-                )
-
-        return render_openid_to_response(response)
-
-
-    def POST(self):
-        query = web.input()
-
-        # check for login
-        logged_in = session.get('logged_in', False)
-
-        if not logged_in:
-            return WebOpenIDLoginRequired()
-
-        request = server.request(query)
-
-        try:
-            response = request.process(logged_in=True)
-
-        except OpenIDResponse.NoneRequest:
-            return web.badrequest()
-
-        except OpenIDResponse.DecisionNeed:
-            if query.has_key('approve'):
-                response = request.approve()
-            elif query.has_key('always'):
-                response = request.always()
+            if self.method == 'POST':
+                if self.query.has_key('approve'):
+                    response = request.approve()
+                elif query.has_key('always'):
+                    response = request.always()
+                else:
+                    response = request.decline()
             else:
-                response = request.decline()
+                data = filter(lambda item: item[0] not in ['approve', 'always'], self.query.items())
+
+                web.header('Content-type', 'text/html')
+                return render.verify(
+                        logged_in=logged_in,
+                        logout_url=web.ctx.homedomain + web.url('/account/logout'),
+                        change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                        no_password=session.get('no_password', False),
+                        decision_url=web.ctx.homedomain + web.url('/account/decision'),
+                        identity=request.request.identity,
+                        trust_root=request.request.trust_root,
+                        query=data,
+                    )
 
         return render_openid_to_response(response)
 
