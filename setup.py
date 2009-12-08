@@ -21,6 +21,9 @@ setup(
                 ('/usr/lib/cgi-bin', [
                         'scripts/openidserver.cgi',
                     ]),
+                ('/etc/lighttpd/conf-available', [
+                        'conf/lighttpd/20-openidserver-fastcgi.conf',
+                    ]),
                 ('/usr/share/doc/openidserver', [
                         'README.md',
                         'COPYING.gz',
