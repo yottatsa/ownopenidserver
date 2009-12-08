@@ -11,5 +11,6 @@ Homepage: http://hidded.name/ownopenidserver/
 Package: openidserver
 Architecture: any
 Depends: ${python:Depends}, python-webpy (>= 0.3), python-openid, python-jinja2, python-flup
+Suggests: httpd
 Description: Own OpenID server
  ownopenidserver is a small and very own OpenID server for you site.

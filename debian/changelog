@@ -1,3 +1,10 @@
+openidserver (0.1.0-2) unstable; urgency=low
+
+  * Apply changes from git
+  * Add suggests
+
+ -- Vladimir S Eremin <me@hidded.name>  Wed, 09 Dec 2009 00:27:37 +0500
+
 openidserver (0.1.0-1) unstable; urgency=low
 
   * Initial release
