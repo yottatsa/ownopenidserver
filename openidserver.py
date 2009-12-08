@@ -72,20 +72,21 @@ class OpenIDResponse(object):
 
     def _encode_response(self, response):
         self.response = response
-        self.webresponse = self.server.openid.encodeResponse(self.response)
+        self.webresponse = self.openid.encodeResponse(self.response)
         return self.webresponse
 
 
-    def __init__(self, server, query):
+    def __init__(self, server, openid, query):
         """
         Decode request
         """
 
         self.server = server
+        self.openid = openid
         self.query = query
 
         # parse openid request
-        self.request = self.server.openid.decodeRequest(query)
+        self.request = self.openid.decodeRequest(query)
 
 
     def process(self, logged_in=False):
@@ -117,7 +118,7 @@ class OpenIDResponse(object):
 
 
         # return openid.server.server.WebResponse
-        return self._encode_response(self.server.openid.handleRequest(self.request))
+        return self._encode_response(self.openid.handleRequest(self.request))
 
 
     def approve(self, identity=None):
@@ -153,13 +154,14 @@ class OpenIDServer(object):
     Manage OpenID server and trust root store, emit response
     """
 
-    def __init__(self, openid, trust_root_store):
-        self.openid = openid
+    def __init__(self, openid_store, trust_root_store):
+        self.openid_store = openid_store
         self.trust_root_store = trust_root_store
 
 
-    def request(self, query):
-        return OpenIDResponse(self, query)
+    def request(self, endpoint, query):
+        openid_server = openid.server.server.Server(self.openid_store, endpoint)
+        return OpenIDResponse(self, openid_server, query)
 
 
 class PasswordManager(web.form.Validator):
@@ -274,7 +276,7 @@ class WebOpenIDIndex(WebHandler):
                 logout_url=web.ctx.homedomain + web.url('/account/logout'),
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
                 no_password=session.get('no_password', False),
-                endpoint=server.openid.op_endpoint,
+                endpoint=web.ctx.homedomain + web.url('/endpoint'),
                 yadis=web.ctx.homedomain + web.url('/yadis.xrds'),
             )
 
@@ -394,7 +396,7 @@ class WebOpenIDYadis(WebHandler):
             (
                 openid.consumer.discover.OPENID_2_0_TYPE,
                 openid.consumer.discover.OPENID_1_0_TYPE,
-                server.openid.op_endpoint,
+                web.ctx.homedomain + web.url('/endpoint'),
                 web.ctx.homedomain,
             )
 
@@ -406,7 +408,7 @@ class WebOpenIDEndpoint(WebHandler):
         # check for login
         logged_in = session.get('logged_in', False)
 
-        request = server.request(self.query)
+        request = server.request(web.ctx.homedomain + web.url('/endpoint'), self.query)
         try:
             response = request.process(logged_in)
 
@@ -434,7 +436,7 @@ class WebOpenIDDecision(WebHandler):
         if not logged_in:
             return WebOpenIDLoginRequired(self.query)
 
-        request = server.request(self.query)
+        request = server.request(web.ctx.homedomain + web.url('/endpoint'), self.query)
 
         try:
             response = request.process(logged_in=True)
@@ -509,11 +511,6 @@ render = web.contrib.template.render_jinja(TEMPLATES)
 
 
 if __name__ == '__main__':
-    try:
-        app.load(os.environ)
-    except: pass
     web.config.debug = True
-    openid_server = openid.server.server.Server(openid_store,
-            web.ctx.homedomain + web.url('/endpoint'))
-    server = OpenIDServer(openid_server, trust_root_store)
+    server = OpenIDServer(openid_store, trust_root_store)
     app.run()
