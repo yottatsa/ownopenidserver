@@ -1,3 +1,9 @@
+openidserver (0.1.0-3) unstable; urgency=low
+
+  * Reduce memory consumption
+
+ -- Vladimir S Eremin <me@hidded.name>  Fri, 08 Jan 2010 23:31:32 +0500
+
 openidserver (0.1.0-2) unstable; urgency=low
 
   * Apply changes from git
