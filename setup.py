@@ -20,6 +20,7 @@ setup(
                     ]),
                 ('/usr/lib/cgi-bin', [
                         'scripts/openidserver.cgi',
+                        'scripts/openidserver.fcgi',
                     ]),
                 ('/etc/lighttpd/conf-available', [
                         'conf/lighttpd/20-openidserver-fastcgi.conf',
