@@ -28,6 +28,7 @@ setup(
                 ('/usr/share/doc/openidserver', [
                         'README.md',
                         'COPYING.gz',
+                        'conf/nginx/nginx-config.txt',
                     ]),
             ],
 )

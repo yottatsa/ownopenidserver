@@ -1,0 +1,6 @@
+	location /openidserver {
+		fastcgi_split_path_info ^(/openidserver)(.*)$;
+		fastcgi_pass unix:/tmp/openidserver.sock;
+		include fastcgi_params;
+		fastcgi_param PATH_INFO $fastcgi_path_info;
+	}
