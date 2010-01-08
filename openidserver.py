@@ -484,33 +484,27 @@ app = web.application(
     )
 
 
-ROOT_STORE = 'sstore'
-TEMPLATES = 'templates'
-
-TRUST_ROOT_STORE = os.path.join(ROOT_STORE, 'trust_root')
-SESSION_STORE = os.path.join(ROOT_STORE, 'sessions')
-PASSWORD_STORE = ROOT_STORE
-
-
-if __name__ != '__main__':
-    try:
-        from localsettings import *
-    except ImportError: pass
-
-
-openid_store = openid.store.filestore.FileOpenIDStore(ROOT_STORE)
-
-trust_root_store = TrustRootStore(TRUST_ROOT_STORE)
-
-sessions_store = web.session.DiskStore(SESSION_STORE)
-session = web.session.Session(app, sessions_store)
-
-password_manager = PasswordManager(PASSWORD_STORE)
-
-render = web.contrib.template.render_jinja(TEMPLATES)
-
-
 if __name__ == '__main__':
+    ROOT_STORE = 'sstore'
+    TEMPLATES = 'templates'
+
+    TRUST_ROOT_STORE = os.path.join(ROOT_STORE, 'trust_root')
+    SESSION_STORE = os.path.join(ROOT_STORE, 'sessions')
+    PASSWORD_STORE = ROOT_STORE
+
+    openid_store = openid.store.filestore.FileOpenIDStore(ROOT_STORE)
+
+    trust_root_store = TrustRootStore(TRUST_ROOT_STORE)
+
+    sessions_store = web.session.DiskStore(SESSION_STORE)
+    session = web.session.Session(app, sessions_store)
+
+    password_manager = PasswordManager(PASSWORD_STORE)
+
+    render = web.contrib.template.render_jinja(TEMPLATES)
+
     web.config.debug = True
+
     server = OpenIDServer(openid_store, trust_root_store)
+
     app.run()

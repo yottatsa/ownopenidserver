@@ -48,4 +48,6 @@ if options.set_password:
     from openidserver import openidserver
 
     password = sys.stdin.readline().strip()
+
+    openidserver.password_manager = openidserver.PasswordManager(localsettings.PASSWORD_STORE)
     openidserver.password_manager.set(password)
