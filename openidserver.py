@@ -1,14 +1,82 @@
 #!/usr/bin/env python
 
-
 import os, os.path
 import urlparse
 import urllib
-import md5, sys, random
+import sys
+import hashlib, random
 
 import web, web.http, web.form, web.session, web.contrib.template
 
 import openid.server.server, openid.store.filestore
+try:
+    from openid.extensions import sreg
+except ImportError:
+    from openid import sreg
+
+
+def read_hcard(url):
+    # from ~isagalaev/scipio/trunk : /utils/__init__.py (revision 38)
+    # Ivan Sagalaev, maniac@softwaremaniacs.org, 2010-05-05 19:12:52
+
+    import re
+    from urllib2 import urlopen
+    import cgi
+    from html5lib import HTMLParser
+
+    try:
+        f = urlopen(url)
+        content_type = f.info().getheader('content-type', 'text/html')
+        value, params = cgi.parse_header(content_type)
+        charset = params.get('charset', 'utf-8').replace("'", '')
+        dom = HTMLParser().parse(urlopen(url).read(512 * 1024).decode(charset, 'ignore'))
+    except IOError:
+        return
+
+    def _find(node, class_name):
+        for child in (c for c in node if c.type == 5):
+            if re.search(r'\b%s\b' % class_name, child.attributes.get('class', '')):
+                return child
+
+    vcard = _find(dom, 'vcard')
+    if vcard is None:
+        return
+
+    def _parse_property(class_name):
+        el = _find(vcard, class_name)
+        if el is None:
+            return
+        if el.name == 'abbr' and 'title' in el.attributes:
+            result = el.attributes['title']
+        else:
+            result = u''.join(s.value for s in el if s.type == 4)
+        return result.replace(u'\n', u' ').strip()
+
+    def _get_gender():
+        TITLES = {
+                'mr': 'M',
+                'ms': 'F',
+                'mrs': 'F',
+            }
+        return TITLES.get(_parse_property('honorific-prefix'), None)
+
+    def _get_bday():
+        bday = _parse_property('bday')
+        if bday:
+            return bday[:10]
+        else:
+            return None
+
+    return {
+            'nickname': _parse_property('nickname') or _parse_property('fn'),
+            'email': _parse_property('email'),
+            'fullname': _parse_property('fn'),
+            'dob': _get_bday(),
+            'gender': _parse_property('x-gender') or _parse_property('gender') or _get_gender(),
+            'postcode': _parse_property('postal-code'),
+            'country': _parse_property('country-name'),
+            'timezone': _parse_property('tz'),
+        }
 
 
 class TrustRootStore(object):
@@ -35,12 +103,22 @@ class TrustRootStore(object):
         return os.path.join(self.directory, filename)
 
 
+    def items(self):
+        return [(item, os.readlink(os.path.join(self.directory, item)))
+                for item in os.listdir(self.directory)
+                if os.path.islink(os.path.join(self.directory, item))]
+
+
     def add(self, url):
         return os.symlink(url, self._get_filename(url))
 
 
     def check(self, url):
         return os.path.lexists(self._get_filename(url))
+
+
+    def delete(self, url):
+        return os.unlink(self._get_filename(url))
 
 
 class OpenIDResponse(object):
@@ -124,13 +202,27 @@ class OpenIDResponse(object):
     def approve(self, identity=None):
         """
         Approve request
-        TODO: sreg
 
         """
-        return self._encode_response(self.request.answer(
+
+        if identity is None:
+            identity = self.request.identity
+
+        response = self.request.answer(
                 allow=True,
                 identity=identity
-            ))
+            )
+
+        try:
+            sreg_data = read_hcard(identity)
+
+            sreg_request = sreg.SRegRequest.fromOpenIDRequest(self.request)
+            sreg_response = sreg.SRegResponse.extractResponse(sreg_request, sreg_data)
+            response.addExtension(sreg_response)
+        except:
+            raise
+
+        return self._encode_response(response)
 
 
     def always(self, identity=None):
@@ -169,6 +261,8 @@ class PasswordManager(web.form.Validator):
     Manage access password
     """
 
+    _hashfunc = hashlib.sha512
+
     class NoPassword(Exception):
         pass
 
@@ -177,7 +271,7 @@ class PasswordManager(web.form.Validator):
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 
-        self.msg = 'Invalid password'
+        self.msg = u'Invalid password'
 
 
     def _get_filename(self):
@@ -186,9 +280,12 @@ class PasswordManager(web.form.Validator):
 
     def _generate_hash(self, salt, password):
         """
-        build hash as md5 of concat of salt and password
+        build hash as _hashfunc of concat of salt and password
         """
-        return md5.md5(''.join([salt, str(password)])).hexdigest()
+        hash = self._hashfunc()
+        hash.update(salt.encode('utf8'))
+        hash.update(password.encode('utf8'))
+        return hash.hexdigest()
 
 
     def valid(self, password):
@@ -252,14 +349,14 @@ class WebHandler(object):
         self.method = None
 
 
-    def GET(self):
+    def GET(self, *args, **kwargs):
         self.method = 'GET'
-        return self.request()
+        return self.request(*args, **kwargs)
 
 
-    def POST(self):
+    def POST(self, *args, **kwargs):
         self.method = 'POST'
-        return self.request()
+        return self.request(*args, **kwargs)
 
 
     def request(self):
@@ -273,8 +370,10 @@ class WebOpenIDIndex(WebHandler):
         web.header('Content-type', 'text/html')
         return render.base(
                 logged_in=session.get('logged_in', False),
+                login_url=web.ctx.homedomain + web.url('/account/login'),
                 logout_url=web.ctx.homedomain + web.url('/account/logout'),
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                check_trusted_url=web.ctx.homedomain + web.url('/account/trusted'),
                 no_password=session.get('no_password', False),
                 endpoint=web.ctx.homedomain + web.url('/endpoint'),
                 yadis=web.ctx.homedomain + web.url('/yadis.xrds'),
@@ -384,6 +483,72 @@ class WebOpenIDChangePassword(WebHandler):
             )
 
 
+class WebOpenIDTrusted(WebHandler):
+
+
+    def request(self):
+        # check for login
+        logged_in = session.get('logged_in', False)
+
+        if not logged_in:
+            return WebOpenIDLoginRequired(self.query)
+
+        items = [
+                ((
+                    item[1],
+                    web.ctx.homedomain + web.url('/account/trusted/%s/delete' % item[0])
+                ))
+                for item in trust_root_store.items()
+            ]
+
+        removed = session.get('trusted_removed_successful', False)
+        session['trusted_removed_successful'] = False
+
+        web.header('Content-type', 'text/html')
+        return render.trusted(
+                logged_in=session.get('logged_in', False),
+                logout_url=web.ctx.homedomain + web.url('/account/logout'),
+                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                no_password=session.get('no_password', False),
+                trusted=items,
+                removed=removed,
+            )
+
+
+class WebOpenIDTrustedDelete(WebHandler):
+
+
+    def request(self, trusted_id):
+        # check for login
+        logged_in = session.get('logged_in', False)
+
+        if not logged_in:
+            return WebOpenIDLoginRequired(self.query)
+
+        try:
+            trust_root = dict(trust_root_store.items())[trusted_id]
+        except:
+            return web.notfound()
+
+        if self.method == 'POST':
+                trust_root_store.delete(trust_root)
+
+                session['trusted_removed_successful']  = True
+
+                return web.found(web.ctx.homedomain + web.url('/account/trusted'))
+
+        web.header('Content-type', 'text/html')
+        return render.trusted_confirm(
+                logged_in=session.get('logged_in', False),
+                logout_url=web.ctx.homedomain + web.url('/account/logout'),
+                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                check_trusted_url=web.ctx.homedomain + web.url('/account/trusted'),
+                trusted_remove_url=web.ctx.homedomain + web.url('/account/trusted/%s/delete' % trusted_id),
+                no_password=session.get('no_password', False),
+                trust_root=trust_root,
+            )
+
+
 class WebOpenIDYadis(WebHandler):
 
 
@@ -438,6 +603,8 @@ class WebOpenIDDecision(WebHandler):
 
         request = server.request(web.ctx.homedomain + web.url('/endpoint'), self.query)
 
+        sreg_request = ''
+
         try:
             response = request.process(logged_in=True)
 
@@ -455,6 +622,31 @@ class WebOpenIDDecision(WebHandler):
             else:
                 data = filter(lambda item: item[0] not in ['approve', 'always'], self.query.items())
 
+                sreg_request = sreg.SRegRequest.fromOpenIDRequest(request.request)
+
+                if sreg_request.required or sreg_request.optional:
+                    try:
+                        hcard = read_hcard(request.request.identity)
+                    except:
+                        hcard = dict()
+
+                    TRANSLATION = {
+                            'fullname': { '__name__': 'Full name' },
+                            'dob': { '__name__': 'Date of Birth' },
+                            'gender': { 'M': 'Male', 'F': 'Female' },
+                            'postcode': { '__name__': 'Postal code' },
+                        }
+
+                    required = [
+                            (
+                                TRANSLATION.get(field, {}).get('__name__', field.title()),
+                                TRANSLATION.get(field, {}).get(hcard.get(field, None), hcard.get(field, None)),
+                            )
+                            for field in (sreg_request.required + sreg_request.optional)
+                        ]
+                else:
+                    required = None
+
                 web.header('Content-type', 'text/html')
                 return render.verify(
                         logged_in=logged_in,
@@ -464,6 +656,7 @@ class WebOpenIDDecision(WebHandler):
                         decision_url=web.ctx.homedomain + web.url('/account/decision'),
                         identity=request.request.identity,
                         trust_root=request.request.trust_root,
+                        required=required,
                         query=data,
                     )
 
@@ -472,10 +665,14 @@ class WebOpenIDDecision(WebHandler):
 
 app = web.application(
         (
+            '', 'WebOpenIDIndex',
+            '/', 'WebOpenIDIndex',
             '/account', 'WebOpenIDIndex',
             '/account/login', 'WebOpenIDLogin',
             '/account/logout', 'WebOpenIDLogout',
             '/account/change_password', 'WebOpenIDChangePassword',
+            '/account/trusted', 'WebOpenIDTrusted',
+            '/account/trusted/(?P<trusted_id>[^/]+)/delete', 'WebOpenIDTrustedDelete',
             '/yadis.xrds', 'WebOpenIDYadis',
             '/endpoint', 'WebOpenIDEndpoint',
             '/account/decision', 'WebOpenIDDecision',

@@ -5,7 +5,13 @@
 {% block content %}
 			<h2>Verification request</h2>
 
-			<p>The site <tt>{{ trust_root|escape }}</tt> has requested verification of your OpenID.</p>
+			<p>The site <tt>{{ trust_root|escape }}</tt> has requested verification of your OpenID as <tt>{{ identity|escape }}</tt>.</p>{% if required %}
+
+			<p>Relying party also require next information:
+				<ul>{% for name, value in required %}
+					<li>{{ name|escape }}: {% if value %}<tt>{{ value|escape }}</tt>{% else %}No data available{% endif %}</li>{% endfor %}
+				</ul>
+			</p>{% endif %}
 
 			<form method="post" action="{{ decision_url }}">
 				<p>Verify your identity to the relying party?</p>

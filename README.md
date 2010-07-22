@@ -9,12 +9,6 @@ Usage
 Just drop openidserver.py with templates to cgi-bin directory and tune your index.html.
 
 
-Plan
-----
-
- * [normal] use sreg
-
-
 Bugs and suggestions
 --------------------
 
