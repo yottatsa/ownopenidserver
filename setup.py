@@ -7,7 +7,7 @@ setup(
         author='Vladimir S Eremin (aka hidded)',
         author_email='me@hidded.name',
         url='http://github.com/hidded/ownopenidserver/',
-        version='0.1.0',
+        version='0.9',
         scripts=['scripts/openidserver-conf'],
         package_dir={'openidserver': ''},
         packages=['openidserver'],
@@ -17,6 +17,8 @@ setup(
                         'templates/login.html',
                         'templates/verify.html',
                         'templates/password.html',
+                        'templates/trusted.html',
+                        'templates/trusted_confirm.html',
                     ]),
                 ('/usr/lib/cgi-bin', [
                         'scripts/openidserver.cgi',

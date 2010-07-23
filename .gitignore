@@ -2,12 +2,3 @@
 *.pyc
 .*.swp
 sstore
-
-# setuptools temp files
-build
-
-# debian temp files
-debian/openidserver*
-debian/files
-debian/*.ex
-debian/python-module-stampdir
