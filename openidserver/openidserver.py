@@ -662,22 +662,54 @@ class WebOpenIDDecision(WebHandler):
         return render_openid_to_response(response)
 
 
-app = web.application(
-        (
-            '', 'WebOpenIDIndex',
-            '/', 'WebOpenIDIndex',
-            '/account', 'WebOpenIDIndex',
-            '/account/login', 'WebOpenIDLogin',
-            '/account/logout', 'WebOpenIDLogout',
-            '/account/change_password', 'WebOpenIDChangePassword',
-            '/account/trusted', 'WebOpenIDTrusted',
-            '/account/trusted/(?P<trusted_id>[^/]+)/delete', 'WebOpenIDTrustedDelete',
-            '/yadis.xrds', 'WebOpenIDYadis',
-            '/endpoint', 'WebOpenIDEndpoint',
-            '/account/decision', 'WebOpenIDDecision',
-        ),
-        globals()
-    )
+def init(
+            root_store_path,
+            trust_root_store_path,
+            session_store_path,
+            password_store_path,
+            templates_path,
+            debug=False
+        ):
+
+    context = globals()
+
+    app = web.application(
+            (
+                '', 'WebOpenIDIndex',
+                '/', 'WebOpenIDIndex',
+                '/account', 'WebOpenIDIndex',
+                '/account/login', 'WebOpenIDLogin',
+                '/account/logout', 'WebOpenIDLogout',
+                '/account/change_password', 'WebOpenIDChangePassword',
+                '/account/trusted', 'WebOpenIDTrusted',
+                '/account/trusted/(?P<trusted_id>[^/]+)/delete', 'WebOpenIDTrustedDelete',
+                '/yadis.xrds', 'WebOpenIDYadis',
+                '/endpoint', 'WebOpenIDEndpoint',
+                '/account/decision', 'WebOpenIDDecision',
+            ),
+            context,
+        )
+
+
+    openid_store = openid.store.filestore.FileOpenIDStore(root_store_path)
+    trust_root_store = TrustRootStore(trust_root_store_path)
+    server = OpenIDServer(openid_store, trust_root_store)
+    context['trust_root_store'] = trust_root_store
+    context['server'] = server
+
+    sessions_store = web.session.DiskStore(session_store_path)
+    session = web.session.Session(app, sessions_store)
+    context['session'] = session
+
+    password_manager = PasswordManager(password_store_path)
+    context['password_manager'] = password_manager
+
+    render = web.contrib.template.render_jinja(templates_path)
+    context['render'] = render
+
+    web.config.debug = debug
+
+    return app
 
 
 if __name__ == '__main__':
@@ -687,20 +719,4 @@ if __name__ == '__main__':
     TRUST_ROOT_STORE = os.path.join(ROOT_STORE, 'trust_root')
     SESSION_STORE = os.path.join(ROOT_STORE, 'sessions')
     PASSWORD_STORE = ROOT_STORE
-
-    openid_store = openid.store.filestore.FileOpenIDStore(ROOT_STORE)
-
-    trust_root_store = TrustRootStore(TRUST_ROOT_STORE)
-
-    sessions_store = web.session.DiskStore(SESSION_STORE)
-    session = web.session.Session(app, sessions_store)
-
-    password_manager = PasswordManager(PASSWORD_STORE)
-
-    render = web.contrib.template.render_jinja(TEMPLATES)
-
-    web.config.debug = True
-
-    server = OpenIDServer(openid_store, trust_root_store)
-
-    app.run()
+    init(ROOT_STORE, TRUST_ROOT_STORE, SESSION_STORE, PASSWORD_STORE, TEMPLATES, True).run()
