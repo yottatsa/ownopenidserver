@@ -215,12 +215,13 @@ class OpenIDResponse(object):
 
         try:
             sreg_data = read_hcard(identity)
-
-            sreg_request = sreg.SRegRequest.fromOpenIDRequest(self.request)
-            sreg_response = sreg.SRegResponse.extractResponse(sreg_request, sreg_data)
-            response.addExtension(sreg_response)
+            if sreg_data:
+                sreg_request = sreg.SRegRequest.fromOpenIDRequest(self.request)
+                sreg_response = sreg.SRegResponse.extractResponse(sreg_request, sreg_data)
+                response.addExtension(sreg_response)
         except:
-            raise
+            pass
+            #TODO: fixme
 
         return self._encode_response(response)
 
@@ -626,7 +627,7 @@ class WebOpenIDDecision(WebHandler):
 
                 if sreg_request.required or sreg_request.optional:
                     try:
-                        hcard = read_hcard(request.request.identity)
+                        hcard = read_hcard(request.request.identity) or dict()
                     except:
                         hcard = dict()
 
