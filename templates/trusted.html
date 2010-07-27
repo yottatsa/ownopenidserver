@@ -5,9 +5,11 @@
 {% block content %}{% if removed==True %}
 			<p class="message">Removed.</p>{% endif %}
 			
-			<h2>Trusted</h2>
+			<h2>Trusted</h2>{% if trusted %}
 
 			<ul id="trusted">{% for name, remove_url  in trusted %}
 				<li><tt>{{ name }}</tt> <a href="{{ remove_url }}">delete</a></li>{% endfor %}
-			</ul>
+			</ul>{% else %}
+
+			<p>Empty.</p>{% endif %}
 {% endblock %}
