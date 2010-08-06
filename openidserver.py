@@ -604,8 +604,6 @@ class WebOpenIDDecision(WebHandler):
 
         request = server.request(web.ctx.homedomain + web.url('/endpoint'), self.query)
 
-        sreg_request = ''
-
         try:
             response = request.process(logged_in=True)
 
