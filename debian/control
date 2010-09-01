@@ -9,8 +9,10 @@ XS-Vcs-git: git://github.com/hidded/ownopenidserver.git
 Homepage: http://hidded.name/ownopenidserver/
 
 Package: openidserver
-Architecture: any
+Architecture: all
+XB-Python-Version: ${python:Versions}
 Depends: ${python:Depends}, python-webpy (>= 0.3), python-openid, python-jinja2, python-flup, python-html5lib
+Provides: ${python:Provides}
 Suggests: httpd | lighttpd | nginx
 Description: Own OpenID server
  ownopenidserver is a small and very own OpenID server for you site.
