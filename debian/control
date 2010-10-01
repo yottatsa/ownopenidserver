@@ -6,7 +6,7 @@ Build-Depends: cdbs, debhelper (>= 7)
 Standards-Version: 3.8.1
 XS-Vcs-Browser: http://github.com/yottatsa/ownopenidserver/
 XS-Vcs-git: git://github.com/yottatsa/ownopenidserver.git
-Homepage: http://yottatsa.name/ownopenidserver/
+Homepage: http://ownopenidserver.com/
 
 Package: openidserver
 Architecture: all

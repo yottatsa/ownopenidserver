@@ -4,9 +4,9 @@ from distutils.core import setup
 
 setup(
         name='openidserver',
-        author='Vladimir S Eremin (aka hidded)',
-        author_email='me@hidded.name',
-        url='http://github.com/hidded/ownopenidserver/',
+        author='Vladimir S Eremin (aka yottatsa)',
+        author_email='me@yottatsa.name',
+        url='http://ownopenidserver.com/',
         version='0.9',
         packages=['openidserver'],
         package_data = {

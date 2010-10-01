@@ -1,10 +1,10 @@
 This package was debianized by:
 
-    Vladimir S Eremin <me@hidded.name> on Sat, 05 Sep 2009 22:30:58 +0600
+    Vladimir S Eremin <me@yottatsa.name> on Sat, 05 Sep 2009 22:30:58 +0600
 
 Upstream Author(s):
 
-    Vladimir S Eremin <me@hidded.name>
+    Vladimir S Eremin <me@yottatsa.name>
 
 Copyright:
 
@@ -30,6 +30,6 @@ Public License version 3 can be found in `/usr/share/common-licenses/GPL-3'.
 
 The Debian packaging is:
 
-    Copyright (C) 2009 Vladimir S Eremin <me@hidded.name>
+    Copyright (C) 2009 Vladimir S Eremin <me@yottatsa.name>
 
 and is licensed under the GPL version 3, see above.
