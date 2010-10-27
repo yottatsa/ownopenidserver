@@ -7,6 +7,10 @@ TARGET_TAR = $(TARGET)/tar
 TARGET_DEB = $(TARGET)/deb
 
 NAME = openidserver
+RELEASE = HEAD
+
+DEBOPTIONS = -uc -us
+
 CGIDIR = openid
 CGISCRIPT = server.py
 
@@ -15,15 +19,26 @@ all: tar deb
 tar:
 	rm -rf $(TARGET_TAR)
 	mkdir -p $(TARGET_TAR)/$(CGIDIR)
-
+	git archive --format tar --prefix $(NAME)/ $(RELEASE) | tar x -C $(TARGET_TAR)
 	cp -rt $(TARGET_TAR)/$(CGIDIR) \
-		openidserver/templates \
-		README.md COPYING.gz \
-
-	install openidserver/openidserver.py $(TARGET_TAR)/$(CGIDIR)/$(CGISCRIPT)
+		$(TARGET_TAR)/$(NAME)/openidserver/templates \
+		$(TARGET_TAR)/$(NAME)/README.md \
+		$(TARGET_TAR)/$(NAME)/COPYING.gz \
+		/usr/share/pyshared/web \
+		/usr/share/pyshared/openid \
+		/usr/share/pyshared/jinja2 \
+		/usr/share/pyshared/flup \
+		/usr/share/pyshared/html5lib
+	install $(TARGET_TAR)/$(NAME)/openidserver/openidserver.py $(TARGET_TAR)/$(CGIDIR)/$(CGISCRIPT)
+	rm -rf $(TARGET_TAR)/$(NAME)
+	find $(TARGET_TAR)/$(CGIDIR) -type d -exec touch '{}/__init__.py' \;
 	tar czf $(TARGET_TAR)/$(NAME).tar.gz -C $(TARGET_TAR) $(CGIDIR)
 
 deb:
+	rm -rf $(TARGET_DEB)
+	mkdir -p $(TARGET_DEB)
+	git archive --format tar --prefix $(NAME)/ $(RELEASE) | tar x -C $(TARGET_DEB)
+	cd $(TARGET_DEB)/$(NAME) && dpkg-buildpackage $(DEBOPTIONS)
 
 clean:
 	rm -rf $(TARGET)
