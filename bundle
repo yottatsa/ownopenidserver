@@ -1,0 +1,29 @@
+#!/usr/bin/make -f
+
+.PHONY: all clean bundle tar deb
+
+TARGET = dist
+TARGET_TAR = $(TARGET)/tar
+TARGET_DEB = $(TARGET)/deb
+
+NAME = openidserver
+CGIDIR = openid
+CGISCRIPT = server.py
+
+all: tar deb
+
+tar:
+	rm -rf $(TARGET_TAR)
+	mkdir -p $(TARGET_TAR)/$(CGIDIR)
+
+	cp -rt $(TARGET_TAR)/$(CGIDIR) \
+		openidserver/templates \
+		README.md COPYING.gz \
+
+	install openidserver/openidserver.py $(TARGET_TAR)/$(CGIDIR)/$(CGISCRIPT)
+	tar czf $(TARGET_TAR)/$(NAME).tar.gz -C $(TARGET_TAR) $(CGIDIR)
+
+deb:
+
+clean:
+	rm -rf $(TARGET)
