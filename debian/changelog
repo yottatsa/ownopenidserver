@@ -1,3 +1,9 @@
+openidserver (0.10) unstable; urgency=low
+
+  * Automagically logout when logged in just now for confirm identity
+
+ --  <me@yottatsa.name>  Mon, 01 Nov 2010 16:46:56 +0500
+
 openidserver (0.9) unstable; urgency=low
 
   * Looks like it ready to fly. And SREG works nice.

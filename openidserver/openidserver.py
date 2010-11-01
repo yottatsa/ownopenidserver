@@ -411,11 +411,13 @@ class WebOpenIDLogin(WebHandler):
             try:
                 if form.validates(self.query):
                     session['logged_in'] = True
+                    data.append(('logged_in', True))
                     return web.found(return_to + '?' + web.http.urlencode(dict(data)))
 
             except PasswordManager.NoPassword:
                 session['no_password'] = True
                 session['logged_in'] = True
+                data.append(('logged_in', True))
                 return web.found(return_to + '?' + web.http.urlencode(dict(data)))
 
         web.header('Content-type', 'text/html')
@@ -592,6 +594,11 @@ class WebOpenIDEndpoint(WebHandler):
         return render_openid_to_response(response)
 
 
+WebOpenIDLogoutForm = web.form.Form(
+            web.form.Checkbox("logout", description="Log out after"),
+        )
+
+
 class WebOpenIDDecision(WebHandler):
 
 
@@ -611,15 +618,25 @@ class WebOpenIDDecision(WebHandler):
             return web.badrequest()
 
         except OpenIDResponse.DecisionNeed:
+
             if self.method == 'POST':
+                if self.query.has_key('logout'):
+                    session['logged_in'] = False
+
                 if self.query.has_key('approve'):
                     response = request.approve()
                 elif self.query.has_key('always'):
                     response = request.always()
                 else:
                     response = request.decline()
+
             else:
-                data = filter(lambda item: item[0] not in ['approve', 'always'], self.query.items())
+                data = filter(
+                        lambda item: item[0] not in [
+                                'approve', 'always',
+                                'logged_in', 'logout'
+                            ],
+                        self.query.items())
 
                 sreg_request = sreg.SRegRequest.fromOpenIDRequest(request.request)
 
@@ -646,6 +663,9 @@ class WebOpenIDDecision(WebHandler):
                 else:
                     required = None
 
+                logout_form = WebOpenIDLogoutForm()
+                logout_form.fill({'logout': self.query.get('logged_in', False)})
+
                 web.header('Content-type', 'text/html')
                 return render.verify(
                         logged_in=logged_in,
@@ -656,6 +676,7 @@ class WebOpenIDDecision(WebHandler):
                         identity=request.request.identity,
                         trust_root=request.request.trust_root,
                         required=required,
+                        logout_form=logout_form,
                         query=data,
                     )
 
