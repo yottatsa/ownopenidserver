@@ -328,6 +328,24 @@ class PasswordManager(web.form.Validator):
             raise
 
 
+class Session(web.session.Session):
+
+    def __init__(self, *args, **kwargs):
+        web.session.Session.__init__(self, *args, **kwargs)
+        self['no_password'] = False
+        self['logged_in'] = False
+
+    def login(self):
+        session['logged_in'] = True
+
+    def logout(self):
+        session['logged_in'] = False
+
+    @property
+    def logged_in(self):
+        return session['logged_in']
+
+
 def render_openid_to_response(response):
     """
     Return WebResponse as web.py response
@@ -370,7 +388,7 @@ class WebOpenIDIndex(WebHandler):
     def request(self):
         web.header('Content-type', 'text/html')
         return render.base(
-                logged_in=session.get('logged_in', False),
+                logged_in=session.logged_in,
                 login_url=web.ctx.homedomain + web.url('/account/login'),
                 logout_url=web.ctx.homedomain + web.url('/account/logout'),
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
@@ -410,19 +428,19 @@ class WebOpenIDLogin(WebHandler):
         if self.method == 'POST':
             try:
                 if form.validates(self.query):
-                    session['logged_in'] = True
+                    session.login()
                     data.append(('logged_in', True))
                     return web.found(return_to + '?' + web.http.urlencode(dict(data)))
 
             except PasswordManager.NoPassword:
                 session['no_password'] = True
-                session['logged_in'] = True
+                session.login()
                 data.append(('logged_in', True))
                 return web.found(return_to + '?' + web.http.urlencode(dict(data)))
 
         web.header('Content-type', 'text/html')
         return render.login(
-                logged_in=session.get('logged_in', False),
+                logged_in=session.logged_in,
                 login_url=web.ctx.homedomain + web.url('/account/login'),
                 logout_url=web.ctx.homedomain + web.url('/account/logout'),
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
@@ -436,7 +454,7 @@ class WebOpenIDLogout(WebHandler):
 
 
     def request(self):
-        session['logged_in'] = False
+        session.logout()
         return web.found(web.ctx.homedomain + web.url('/account/login'))
 
 
@@ -461,9 +479,7 @@ class WebOpenIDChangePassword(WebHandler):
 
     def request(self):
         # check for login
-        logged_in = session.get('logged_in', False)
-
-        if not logged_in:
+        if not session.logged_in:
             return WebOpenIDLoginRequired(self.query)
 
         form = WebOpenIDChangePasswordForm()
@@ -478,7 +494,7 @@ class WebOpenIDChangePassword(WebHandler):
 
         web.header('Content-type', 'text/html')
         return render.password(
-                logged_in=session.get('logged_in', False),
+                logged_in=session.logged_in,
                 logout_url=web.ctx.homedomain + web.url('/account/logout'),
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
                 no_password=session.get('no_password', False),
@@ -491,9 +507,7 @@ class WebOpenIDTrusted(WebHandler):
 
     def request(self):
         # check for login
-        logged_in = session.get('logged_in', False)
-
-        if not logged_in:
+        if not session.logged_in:
             return WebOpenIDLoginRequired(self.query)
 
         items = [
@@ -509,7 +523,7 @@ class WebOpenIDTrusted(WebHandler):
 
         web.header('Content-type', 'text/html')
         return render.trusted(
-                logged_in=session.get('logged_in', False),
+                logged_in=session.logged_in,
                 logout_url=web.ctx.homedomain + web.url('/account/logout'),
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
                 no_password=session.get('no_password', False),
@@ -523,9 +537,7 @@ class WebOpenIDTrustedDelete(WebHandler):
 
     def request(self, trusted_id):
         # check for login
-        logged_in = session.get('logged_in', False)
-
-        if not logged_in:
+        if not session.logged_in:
             return WebOpenIDLoginRequired(self.query)
 
         try:
@@ -542,7 +554,7 @@ class WebOpenIDTrustedDelete(WebHandler):
 
         web.header('Content-type', 'text/html')
         return render.trusted_confirm(
-                logged_in=session.get('logged_in', False),
+                logged_in=session.logged_in,
                 logout_url=web.ctx.homedomain + web.url('/account/logout'),
                 change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
                 check_trusted_url=web.ctx.homedomain + web.url('/account/trusted'),
@@ -558,9 +570,17 @@ class WebOpenIDYadis(WebHandler):
     def request(self):
         import openid.consumer
         web.header('Content-type', 'application/xrds+xml')
-        return """<?xml version="1.0" encoding="UTF-8"?>\n<xrds:XRDS \
-                xmlns:xrds="xri://$xrds" xmlns="xri://$xrd*($v*2.0)"><XRD><Service \
-                priority="0"><Type>%s</Type><Type>%s</Type><URI>%s</URI><LocalID>%s</LocalID></Service></XRD></xrds:XRDS>""" %\
+        return """<?xml version="1.0" encoding="UTF-8"?>
+<xrds:XRDS xmlns:xrds="xri://$xrds" xmlns="xri://$xrd*($v*2.0)">
+    <XRD>
+        <Service priority="0">
+            <Type>%s</Type>
+            <Type>%s</Type>
+            <URI>%s</URI>
+            <LocalID>%s</LocalID>
+        </Service>
+    </XRD>
+</xrds:XRDS>\n""" %\
             (
                 openid.consumer.discover.OPENID_2_0_TYPE,
                 openid.consumer.discover.OPENID_1_0_TYPE,
@@ -574,11 +594,9 @@ class WebOpenIDEndpoint(WebHandler):
 
     def request(self):
         # check for login
-        logged_in = session.get('logged_in', False)
-
         request = server.request(web.ctx.homedomain + web.url('/endpoint'), self.query)
         try:
-            response = request.process(logged_in)
+            response = request.process(session.logged_in)
 
         except OpenIDResponse.NoneRequest:
             return web.badrequest()
@@ -590,6 +608,10 @@ class WebOpenIDEndpoint(WebHandler):
         except OpenIDResponse.DecisionNeed:
             # redirect request to decision page in restricted area
             return web.found(web.ctx.homedomain + web.url('/account/decision', **self.query))
+
+        if self.query.get('logged_in', False):
+            session.logout()
+
 
         return render_openid_to_response(response)
 
@@ -604,9 +626,7 @@ class WebOpenIDDecision(WebHandler):
 
     def request(self):
         # check for login
-        logged_in = session.get('logged_in', False)
-
-        if not logged_in:
+        if not session.logged_in:
             return WebOpenIDLoginRequired(self.query)
 
         request = server.request(web.ctx.homedomain + web.url('/endpoint'), self.query)
@@ -620,8 +640,8 @@ class WebOpenIDDecision(WebHandler):
         except OpenIDResponse.DecisionNeed:
 
             if self.method == 'POST':
-                if self.query.has_key('logout'):
-                    session['logged_in'] = False
+                if self.query.get('logout', False):
+                    session.logout()
 
                 if self.query.has_key('approve'):
                     response = request.approve()
@@ -675,7 +695,7 @@ class WebOpenIDDecision(WebHandler):
 
                 web.header('Content-type', 'text/html')
                 return render.verify(
-                        logged_in=logged_in,
+                        logged_in=session.logged_in,
                         logout_url=web.ctx.homedomain + web.url('/account/logout'),
                         change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
                         no_password=session.get('no_password', False),
@@ -726,7 +746,7 @@ def init(
     context['server'] = server
 
     sessions_store = web.session.DiskStore(session_store_path)
-    session = web.session.Session(app, sessions_store)
+    session = Session(app, sessions_store)
     context['session'] = session
 
     password_manager = PasswordManager(password_store_path)

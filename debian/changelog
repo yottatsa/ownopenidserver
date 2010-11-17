@@ -1,3 +1,10 @@
+openidserver (0.11) unstable; urgency=low
+
+  * Automagically logout when user logged in just at the verification
+    process and site has been marked as trusted. (Closes #2)
+
+ --  <me@yottatsa.name>  Wed, 17 Nov 2010 11:42:34 +0500
+
 openidserver (0.10) unstable; urgency=low
 
   * Automagically logout when logged in just now for confirm identity

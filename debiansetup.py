@@ -7,7 +7,7 @@ setup(
         author='Vladimir S Eremin (aka yottatsa)',
         author_email='me@yottatsa.name',
         url='http://ownopenidserver.com/',
-        version='0.10',
+        version='0.11',
         scripts=['scripts/openidserver-conf'],
         packages=['openidserver'],
         data_files=[
