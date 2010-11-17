@@ -1,3 +1,7 @@
-# work files
+# temp files
 *.pyc
 .*.swp
+
+# debug files
+dist
+openidserver/sstore

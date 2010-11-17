@@ -330,11 +330,6 @@ class PasswordManager(web.form.Validator):
 
 class Session(web.session.Session):
 
-    def __init__(self, *args, **kwargs):
-        web.session.Session.__init__(self, *args, **kwargs)
-        self['no_password'] = False
-        self['logged_in'] = False
-
     def login(self):
         session['logged_in'] = True
 
@@ -343,7 +338,7 @@ class Session(web.session.Session):
 
     @property
     def logged_in(self):
-        return session['logged_in']
+        return session.get('logged_in', False)
 
 
 def render_openid_to_response(response):
