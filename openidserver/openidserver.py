@@ -653,15 +653,22 @@ class WebOpenIDDecision(WebHandler):
                             'postcode': { '__name__': 'Postal code' },
                         }
 
-                    required = [
+                    profile = [
                             (
                                 TRANSLATION.get(field, {}).get('__name__', field.title()),
                                 TRANSLATION.get(field, {}).get(hcard.get(field, None), hcard.get(field, None)),
                             )
-                            for field in (sreg_request.required + sreg_request.optional)
+                            for field in sreg_request.required
+                        ] + [
+                            (
+                                TRANSLATION.get(field, {}).get('__name__', field.title()),
+                                TRANSLATION.get(field, {}).get(hcard.get(field, None), hcard.get(field, None)),
+                            )
+                            for field in sreg_request.optional
+                                if hcard.get(field, None) is not None
                         ]
                 else:
-                    required = None
+                    profile = None
 
                 logout_form = WebOpenIDLogoutForm()
                 logout_form.fill({'logout': self.query.get('logged_in', False)})
@@ -675,7 +682,7 @@ class WebOpenIDDecision(WebHandler):
                         decision_url=web.ctx.homedomain + web.url('/account/decision'),
                         identity=request.request.identity,
                         trust_root=request.request.trust_root,
-                        required=required,
+                        profile=profile,
                         logout_form=logout_form,
                         query=data,
                     )
