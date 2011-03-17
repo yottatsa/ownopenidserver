@@ -8,76 +8,121 @@ import hashlib, random
 
 import web, web.http, web.form, web.session, web.contrib.template
 
-import openid.server.server, openid.store.filestore
+import openid.server.server, openid.store.filestore, openid.fetchers
 try:
     from openid.extensions import sreg
 except ImportError:
     from openid import sreg
+    
+import html5lib
 
 
-def read_hcard(url):
+
+class HCardParser(html5lib.HTMLParser):
+    # based on code
     # from ~isagalaev/scipio/trunk : /utils/__init__.py (revision 38)
     # Ivan Sagalaev, maniac@softwaremaniacs.org, 2010-05-05 19:12:52
 
-    import re
-    from urllib2 import urlopen
-    import cgi
-    from html5lib import HTMLParser
+    class HCard(object):
+        
+        def __init__(self, tree):
+            self.tree = tree
+            
+        def __getitem__(self, key):
+            if key in dir(self):
+                attr = self.__getattribute__(key)
+                if callable(attr):
+                    return attr()
+                else:
+                    return attr
+            else:
+                return self._parse_property(key)
+            
+        def _parse_property(self, class_name):
+            result = list()
+            for el in HCardParser.getElementsByClassName(self.tree, class_name):
+                if el.name == 'abbr' and 'title' in el.attributes:
+                    result.append(el.attributes['title'].strip())
+                else:
+                    result.extend((s.value.strip() for s in el if s.type == 4))
+            return u''.join(result).replace(u'\n', u' ')
 
-    try:
-        f = urlopen(url)
-        content_type = f.info().getheader('content-type', 'text/html')
-        value, params = cgi.parse_header(content_type)
-        charset = params.get('charset', 'utf-8').replace("'", '')
-        dom = HTMLParser().parse(urlopen(url).read(512 * 1024).decode(charset, 'ignore'))
-    except IOError:
-        return
+        def profile(self, required, optional=[]):
+            TRANSLATION = {
+                    'fullname': { '__name__': 'Full name' },
+                    'dob': { '__name__': 'Date of Birth' },
+                    'gender': { 'M': 'Male', 'F': 'Female' },
+                    'postcode': { '__name__': 'Postal code' },
+                }
+                
+            def item(field, value):
+                translation = TRANSLATION.get(field, {})
+                title = translation.get('__name__', field.title())
+                if value:
+                    value = translation.get(value, value)
+                return (title, value)
+            
+            profile = list()
+            for field in required:
+                profile.append(item(field, self[field]))
+            for field in optional:
+                if self[field]:
+                    profile.append(item(field, self[field]))
+            return profile
 
-    def _find(node, class_name):
+
+        def gender(self):
+            TITLES = {
+                    'mr': 'M',
+                    'ms': 'F',
+                    'mrs': 'F', 
+                }
+            return \
+                self._parse_property('x-gender') or \
+                self._parse_property('gender') or \
+                TITLES.get(self._parse_property('honorific-prefix'), None)
+
+        def dob(self):
+            bday = self._parse_property('bday')
+            if bday:
+                return bday[:10]
+            else:
+                return None
+                
+        def nickname(self):
+            return \
+                self._parse_property('nickname') or \
+                self._parse_property('fn')
+                    
+        def fullname(self):
+            return self['fn']
+            
+        def postcode(self):
+            return self['postal-code']
+        
+        def country(self):
+            return self['country-name']
+            
+        def timezone(self):
+            return self['tz']
+                
+    @classmethod
+    def getElementsByClassName(cls, node, class_name):
+        nodes = list()
         for child in (c for c in node if c.type == 5):
-            if re.search(r'\b%s\b' % class_name, child.attributes.get('class', '')):
-                return child
+            if class_name in child.attributes.get('class', '').split():
+                nodes.append(child)
+        return nodes
 
-    vcard = _find(dom, 'vcard')
-    if vcard is None:
-        return
+    def parse_url(self, url):
+        document = openid.fetchers.fetch(url)
+        charset = document.headers.get('charset', 'utf-8').replace("'", '')
+        return self.parse(document.body.decode(charset, 'ignore'))
 
-    def _parse_property(class_name):
-        el = _find(vcard, class_name)
-        if el is None:
-            return
-        if el.name == 'abbr' and 'title' in el.attributes:
-            result = el.attributes['title']
-        else:
-            result = u''.join(s.value for s in el if s.type == 4)
-        return result.replace(u'\n', u' ').strip()
-
-    def _get_gender():
-        TITLES = {
-                'mr': 'M',
-                'ms': 'F',
-                'mrs': 'F',
-            }
-        return TITLES.get(_parse_property('honorific-prefix'), None)
-
-    def _get_bday():
-        bday = _parse_property('bday')
-        if bday:
-            return bday[:10]
-        else:
-            return None
-
-    return {
-            'nickname': _parse_property('nickname') or _parse_property('fn'),
-            'email': _parse_property('email'),
-            'fullname': _parse_property('fn'),
-            'dob': _get_bday(),
-            'gender': _parse_property('x-gender') or _parse_property('gender') or _get_gender(),
-            'postcode': _parse_property('postal-code'),
-            'country': _parse_property('country-name'),
-            'timezone': _parse_property('tz'),
-        }
-
+    def parse(self, *args, **kwargs):
+        tree = super(HCardParser, self).parse(*args, **kwargs)
+        return (HCardParser.HCard(node) for node in HCardParser.getElementsByClassName(tree, 'vcard'))
+        
 
 class TrustRootStore(object):
     """
@@ -214,8 +259,9 @@ class OpenIDResponse(object):
             )
 
         try:
-            sreg_data = read_hcard(identity)
-            if sreg_data:
+            hcards = HCardParser().parse_url(identity)
+            if hcards:
+                sreg_data = hcards[0]
                 sreg_request = sreg.SRegRequest.fromOpenIDRequest(self.request)
                 sreg_response = sreg.SRegResponse.extractResponse(sreg_request, sreg_data)
                 response.addExtension(sreg_response)
@@ -655,35 +701,15 @@ class WebOpenIDDecision(WebHandler):
 
                 sreg_request = sreg.SRegRequest.fromOpenIDRequest(request.request)
 
+                profile = None
                 if sreg_request.required or sreg_request.optional:
                     try:
-                        hcard = read_hcard(request.request.identity) or dict()
+                        hcards = HCardParser().parse_url(identity)
+                        if hcards:
+                            hcard = hcards[0]
+                            profile = hcard.profile(sreg_request.required, sreg_request.optional)
                     except:
-                        hcard = dict()
-
-                    TRANSLATION = {
-                            'fullname': { '__name__': 'Full name' },
-                            'dob': { '__name__': 'Date of Birth' },
-                            'gender': { 'M': 'Male', 'F': 'Female' },
-                            'postcode': { '__name__': 'Postal code' },
-                        }
-
-                    profile = [
-                            (
-                                TRANSLATION.get(field, {}).get('__name__', field.title()),
-                                TRANSLATION.get(field, {}).get(hcard.get(field, None), hcard.get(field, None)),
-                            )
-                            for field in sreg_request.required
-                        ] + [
-                            (
-                                TRANSLATION.get(field, {}).get('__name__', field.title()),
-                                TRANSLATION.get(field, {}).get(hcard.get(field, None), hcard.get(field, None)),
-                            )
-                            for field in sreg_request.optional
-                                if hcard.get(field, None) is not None
-                        ]
-                else:
-                    profile = None
+                        pass
 
                 logout_form = WebOpenIDLogoutForm()
                 logout_form.fill({'logout': self.query.get('logged_in', False)})
