@@ -5,3 +5,8 @@
 # debug files
 dist
 openidserver/sstore
+
+# XCode
+ownopenidserver.xcodeproj
+Libraries
+build
