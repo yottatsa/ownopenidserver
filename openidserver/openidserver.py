@@ -37,6 +37,7 @@ class HCardParser(html5lib.HTMLParser):
                     return attr
             else:
                 return self._parse_property(key)
+	get = __getitem__
             
         def _parse_property(self, class_name):
             result = list()
@@ -261,7 +262,7 @@ class OpenIDResponse(object):
         try:
             hcards = HCardParser().parse_url(identity)
             if hcards:
-                sreg_data = hcards[0]
+                sreg_data = hcards.next()
                 sreg_request = sreg.SRegRequest.fromOpenIDRequest(self.request)
                 sreg_response = sreg.SRegResponse.extractResponse(sreg_request, sreg_data)
                 response.addExtension(sreg_response)
@@ -704,10 +705,10 @@ class WebOpenIDDecision(WebHandler):
                 profile = None
                 if sreg_request.required or sreg_request.optional:
                     try:
-                        hcards = HCardParser().parse_url(identity)
-                        if hcards:
-                            hcard = hcards[0]
-                            profile = hcard.profile(sreg_request.required, sreg_request.optional)
+			hcards = HCardParser().parse_url(request.request.identity)
+			if hcards:
+			    hcard = hcards.next()
+			    profile = hcard.profile(sreg_request.required, sreg_request.optional)
                     except:
                         pass
 
