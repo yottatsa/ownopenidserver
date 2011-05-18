@@ -7,7 +7,7 @@ setup(
         author='Vladimir S Eremin (aka yottatsa)',
         author_email='me@yottatsa.name',
         url='http://ownopenidserver.com/',
-        version='0.11',
+        version='1.0',
         scripts=['scripts/openidserver-conf'],
         packages=['openidserver'],
         data_files=[
@@ -22,6 +22,9 @@ setup(
                 ('/usr/lib/cgi-bin', [
                         'scripts/openidserver.cgi',
                         'scripts/openidserver.fcgi',
+                    ]),
+                ('/etc/apache2/conf.d', [
+                        'conf/apache2/openidserver.conf',
                     ]),
                 ('/etc/lighttpd/conf-available', [
                         'conf/lighttpd/20-openidserver-fastcgi.conf',

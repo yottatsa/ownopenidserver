@@ -1,3 +1,9 @@
+openidserver (1.0) unstable; urgency=low
+
+  * I think it is ready for release
+  
+ --  <me@yottatsa.name>  Wed, 18 May 2011 17:01:50 +0600
+
 openidserver (0.11) unstable; urgency=low
 
   * Automagically logout when user logged in just at the verification

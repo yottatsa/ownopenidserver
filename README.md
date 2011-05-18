@@ -1,7 +1,7 @@
 ownopenidserver
 ===============
 
-*ownopenidserver* is a small and very own OpenID server for you site.
+*ownopenidserver* is a small and very own OpenID server for your site.
 
 
 Usage
