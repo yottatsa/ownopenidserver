@@ -153,13 +153,13 @@
 			<p class="message">First of all you need to <a href="{{ change_password_url }}">set up you access password</a>.</p>{% endif %}{% block content %}{% if logged_in==True %}
 
 			<h2>Home</h2>
-			<p>Hi, I'am your own OpenID server.</p>
+			<p>Hi, I am your own OpenID server.</p>
 			<ul id="options">
 				<li><a href="{{ logout_url }}">log out from here</a></li>
 				<li><a href="{{ change_password_url }}">change access password</a></li>
 				<li><a href="{{ check_trusted_url }}">check trusted list</a></li>
 			</ul>{% else %}
-			<p>I'am ready. Please <a href="{{ login_url }}">log in</a>.</p>
+			<p>I am ready. Please <a href="{{ login_url }}">log in</a>.</p>
 			{% endif %}
 {% endblock %}
 		</div>
