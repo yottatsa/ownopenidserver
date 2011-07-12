@@ -11,16 +11,18 @@ application provides two basic services.
   authenticated in.
 - Web interfaces for management your personal account.
 
-*ownopenidserver* relies on and depends on three external modules:
+*ownopenidserver* relies on and depends on these external modules:
 
 - [python-openid][] for sure
 - [web.py][] provides lihgtweight HTTP and CGI inteface and web framework
+- [flup][] provides FastCGI interface for web.py
 - [Jinja2][] is used as a HTML templating library for management interface
-- [html5lib][] is a helper library to parse HCard microformat of your homepage.
+- [html5lib][] is a helper library to parse hCard microformat of your homepage.
 
 
 [python-openid]: http://pypi.python.org/pypi/python-openid/
 [web.py]: http://webpy.org/
+[flup]: http://www.saddi.com/software/flup/
 [Jinja2]: http://jinja.pocoo.org/docs/
 [html5lib]: http://code.google.com/p/html5lib/
 
@@ -30,10 +32,10 @@ Initial setup
 Before starting using this server as your main provider, probably you'd like to
 play with it a little.
 
-So, make sure that all three mentioned dependenices are installed and then type
+So, make sure that all mentioned dependenices are installed and then type
 
-    cd ownopenid
-    python ./ownopenid.py
+    cd openidserver
+    python ./openidserver.py
 
 Thanks to web2py leverage, the server will be launched with default settings on
 a port 8080 listening all your interfaces.
@@ -94,7 +96,7 @@ or FastCGI application.
 What to include on your website page
 ------------------------------------
 
-Suppose you're teh owner of domain example.com and you want to authenticate
+Suppose you're the owner of domain example.com and you want to authenticate
 yourself in this role.  Assume also, that you have successfully launched
 *ownopenidserver* at http://id.example.com (by the way, there is nothing wrong
 to place your provider not on a subdomain, but on another address in the same
