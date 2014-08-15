@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 import os, os.path
 import urlparse
@@ -16,7 +16,12 @@ except ImportError:
     
 import html5lib
 
+# if you're not running this on port 80
+#os.environ["SERVER_PORT"] = "1111" # string. not int.
 
+def _secure_homedomain(ctx):
+    "Like ctx.homedomain but no http:// though it's a proxy :)"
+    return 'https://'+ctx.host
 
 class HCardParser(html5lib.HTMLParser):
     # based on code
@@ -37,7 +42,7 @@ class HCardParser(html5lib.HTMLParser):
                     return attr
             else:
                 return self._parse_property(key)
-	get = __getitem__
+        get = __getitem__
             
         def _parse_property(self, class_name):
             result = list()
@@ -431,19 +436,19 @@ class WebOpenIDIndex(WebHandler):
         web.header('Content-type', 'text/html')
         return render.base(
                 logged_in=session.logged_in,
-                login_url=web.ctx.homedomain + web.url('/account/login'),
-                logout_url=web.ctx.homedomain + web.url('/account/logout'),
-                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
-                check_trusted_url=web.ctx.homedomain + web.url('/account/trusted'),
+                login_url=_secure_homedomain(web.ctx) + web.url('/account/login'),
+                logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
+                change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
+                check_trusted_url=_secure_homedomain(web.ctx) + web.url('/account/trusted'),
                 no_password=session.get('no_password', False),
-                endpoint=web.ctx.homedomain + web.url('/endpoint'),
-                yadis=web.ctx.homedomain + web.url('/yadis.xrds'),
+                endpoint=_secure_homedomain(web.ctx) + web.url('/endpoint'),
+                yadis=_secure_homedomain(web.ctx) + web.url('/yadis.xrds'),
             )
 
 
 def WebOpenIDLoginRequired(query):
-    query['return_to'] = web.ctx.homedomain + web.url(web.ctx.path)
-    return web.found(web.ctx.homedomain + web.url('/account/login', **query))
+    query['return_to'] = _secure_homedomain(web.ctx) + web.url(web.ctx.path)
+    return web.found(_secure_homedomain(web.ctx) + web.url('/account/login', **query))
 
 
 def WebOpenIDLoginForm(validator):
@@ -459,7 +464,7 @@ class WebOpenIDLogin(WebHandler):
 
 
     def request(self):
-        return_to = self.query.get('return_to', web.ctx.homedomain + web.url('/account'))
+        return_to = self.query.get('return_to', _secure_homedomain(web.ctx) + web.url('/account'))
 
         data = filter(lambda item: item[0] not in ['password'], self.query.items())
 
@@ -483,9 +488,9 @@ class WebOpenIDLogin(WebHandler):
         web.header('Content-type', 'text/html')
         return render.login(
                 logged_in=session.logged_in,
-                login_url=web.ctx.homedomain + web.url('/account/login'),
-                logout_url=web.ctx.homedomain + web.url('/account/logout'),
-                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                login_url=_secure_homedomain(web.ctx) + web.url('/account/login'),
+                logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
+                change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
                 no_password=session.get('no_password', False),
                 form=form,
                 query=data,
@@ -497,7 +502,7 @@ class WebOpenIDLogout(WebHandler):
 
     def request(self):
         session.logout()
-        return web.found(web.ctx.homedomain + web.url('/account/login'))
+        return web.found(_secure_homedomain(web.ctx) + web.url('/account/login'))
 
 
 WebOpenIDChangePasswordForm = web.form.Form(
@@ -532,13 +537,13 @@ class WebOpenIDChangePassword(WebHandler):
 
                 session['no_password'] = False
 
-                return web.found(web.ctx.homedomain + web.url('/account'))
+                return web.found(_secure_homedomain(web.ctx) + web.url('/account'))
 
         web.header('Content-type', 'text/html')
         return render.password(
                 logged_in=session.logged_in,
-                logout_url=web.ctx.homedomain + web.url('/account/logout'),
-                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
+                change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
                 no_password=session.get('no_password', False),
                 form=form,
             )
@@ -555,7 +560,7 @@ class WebOpenIDTrusted(WebHandler):
         items = [
                 ((
                     item[1],
-                    web.ctx.homedomain + web.url('/account/trusted/%s/delete' % item[0])
+                    _secure_homedomain(web.ctx) + web.url('/account/trusted/%s/delete' % item[0])
                 ))
                 for item in trust_root_store.items()
             ]
@@ -566,8 +571,8 @@ class WebOpenIDTrusted(WebHandler):
         web.header('Content-type', 'text/html')
         return render.trusted(
                 logged_in=session.logged_in,
-                logout_url=web.ctx.homedomain + web.url('/account/logout'),
-                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
+                change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
                 no_password=session.get('no_password', False),
                 trusted=items,
                 removed=removed,
@@ -592,15 +597,15 @@ class WebOpenIDTrustedDelete(WebHandler):
 
                 session['trusted_removed_successful']  = True
 
-                return web.found(web.ctx.homedomain + web.url('/account/trusted'))
+                return web.found(_secure_homedomain(web.ctx) + web.url('/account/trusted'))
 
         web.header('Content-type', 'text/html')
         return render.trusted_confirm(
                 logged_in=session.logged_in,
-                logout_url=web.ctx.homedomain + web.url('/account/logout'),
-                change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
-                check_trusted_url=web.ctx.homedomain + web.url('/account/trusted'),
-                trusted_remove_url=web.ctx.homedomain + web.url('/account/trusted/%s/delete' % trusted_id),
+                logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
+                change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
+                check_trusted_url=_secure_homedomain(web.ctx) + web.url('/account/trusted'),
+                trusted_remove_url=_secure_homedomain(web.ctx) + web.url('/account/trusted/%s/delete' % trusted_id),
                 no_password=session.get('no_password', False),
                 trust_root=trust_root,
             )
@@ -626,8 +631,8 @@ class WebOpenIDYadis(WebHandler):
             (
                 openid.consumer.discover.OPENID_2_0_TYPE,
                 openid.consumer.discover.OPENID_1_0_TYPE,
-                web.ctx.homedomain + web.url('/endpoint'),
-                web.ctx.homedomain,
+                _secure_homedomain(web.ctx) + web.url('/endpoint'),
+                _secure_homedomain(web.ctx),
             )
 
 
@@ -636,7 +641,7 @@ class WebOpenIDEndpoint(WebHandler):
 
     def request(self):
         # check for login
-        request = server.request(web.ctx.homedomain + web.url('/endpoint'), self.query)
+        request = server.request(_secure_homedomain(web.ctx) + web.url('/endpoint'), self.query)
         try:
             response = request.process(session.logged_in)
 
@@ -649,7 +654,7 @@ class WebOpenIDEndpoint(WebHandler):
 
         except OpenIDResponse.DecisionNeed:
             # redirect request to decision page in restricted area
-            return web.found(web.ctx.homedomain + web.url('/account/decision', **self.query))
+            return web.found(_secure_homedomain(web.ctx) + web.url('/account/decision', **self.query))
 
         if self.query.get('logged_in', False):
             session.logout()
@@ -671,7 +676,7 @@ class WebOpenIDDecision(WebHandler):
         if not session.logged_in:
             return WebOpenIDLoginRequired(self.query)
 
-        request = server.request(web.ctx.homedomain + web.url('/endpoint'), self.query)
+        request = server.request(_secure_homedomain(web.ctx) + web.url('/endpoint'), self.query)
 
         try:
             response = request.process(logged_in=True)
@@ -705,10 +710,10 @@ class WebOpenIDDecision(WebHandler):
                 profile = None
                 if sreg_request.required or sreg_request.optional:
                     try:
-			hcards = HCardParser().parse_url(request.request.identity)
-			if hcards:
-			    hcard = hcards.next()
-			    profile = hcard.profile(sreg_request.required, sreg_request.optional)
+                        hcards = HCardParser().parse_url(request.request.identity)
+                        if hcards:
+                            hcard = hcards.next()
+                            profile = hcard.profile(sreg_request.required, sreg_request.optional)
                     except:
                         pass
 
@@ -718,10 +723,10 @@ class WebOpenIDDecision(WebHandler):
                 web.header('Content-type', 'text/html')
                 return render.verify(
                         logged_in=session.logged_in,
-                        logout_url=web.ctx.homedomain + web.url('/account/logout'),
-                        change_password_url=web.ctx.homedomain + web.url('/account/change_password'),
+                        logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
+                        change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
                         no_password=session.get('no_password', False),
-                        decision_url=web.ctx.homedomain + web.url('/account/decision'),
+                        decision_url=_secure_homedomain(web.ctx) + web.url('/account/decision'),
                         identity=request.request.identity,
                         trust_root=request.request.trust_root,
                         profile=profile,
