@@ -435,6 +435,7 @@ class WebOpenIDIndex(WebHandler):
     def request(self):
         web.header('Content-type', 'text/html')
         return render.base(
+                home_url=_secure_homedomain(web.ctx) + web.url('/'),
                 logged_in=session.logged_in,
                 login_url=_secure_homedomain(web.ctx) + web.url('/account/login'),
                 logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
@@ -487,6 +488,7 @@ class WebOpenIDLogin(WebHandler):
 
         web.header('Content-type', 'text/html')
         return render.login(
+                home_url=_secure_homedomain(web.ctx) + web.url('/'),
                 logged_in=session.logged_in,
                 login_url=_secure_homedomain(web.ctx) + web.url('/account/login'),
                 logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
@@ -541,6 +543,7 @@ class WebOpenIDChangePassword(WebHandler):
 
         web.header('Content-type', 'text/html')
         return render.password(
+                home_url=_secure_homedomain(web.ctx) + web.url('/'),
                 logged_in=session.logged_in,
                 logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
                 change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
@@ -570,6 +573,7 @@ class WebOpenIDTrusted(WebHandler):
 
         web.header('Content-type', 'text/html')
         return render.trusted(
+                home_url=_secure_homedomain(web.ctx) + web.url('/'),
                 logged_in=session.logged_in,
                 logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
                 change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
@@ -601,6 +605,7 @@ class WebOpenIDTrustedDelete(WebHandler):
 
         web.header('Content-type', 'text/html')
         return render.trusted_confirm(
+                home_url=_secure_homedomain(web.ctx) + web.url('/'),
                 logged_in=session.logged_in,
                 logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
                 change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
@@ -722,6 +727,7 @@ class WebOpenIDDecision(WebHandler):
 
                 web.header('Content-type', 'text/html')
                 return render.verify(
+                        home_url=_secure_homedomain(web.ctx) + web.url('/'),
                         logged_in=session.logged_in,
                         logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
                         change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
