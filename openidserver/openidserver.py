@@ -731,13 +731,19 @@ class WebOpenIDDecision(WebHandler):
 
         return render_openid_to_response(response)
 
+ROOT_STORE = 'sstore'
+TEMPLATES = 'templates'
+
+TRUST_ROOT_STORE = os.path.join(ROOT_STORE, 'trust_root')
+SESSION_STORE = os.path.join(ROOT_STORE, 'sessions')
+PASSWORD_STORE = ROOT_STORE
 
 def init(
-            root_store_path,
-            trust_root_store_path,
-            session_store_path,
-            password_store_path,
-            templates_path,
+            root_store_path=ROOT_STORE,
+            trust_root_store_path=TRUST_ROOT_STORE,
+            session_store_path=SESSION_STORE,
+            password_store_path=PASSWORD_STORE,
+            templates_path=TEMPLATES,
             debug=False
         ):
 
@@ -783,10 +789,5 @@ def init(
 
 
 if __name__ == '__main__':
-    ROOT_STORE = 'sstore'
-    TEMPLATES = 'templates'
+    init().run()
 
-    TRUST_ROOT_STORE = os.path.join(ROOT_STORE, 'trust_root')
-    SESSION_STORE = os.path.join(ROOT_STORE, 'sessions')
-    PASSWORD_STORE = ROOT_STORE
-    init(ROOT_STORE, TRUST_ROOT_STORE, SESSION_STORE, PASSWORD_STORE, TEMPLATES, True).run()
