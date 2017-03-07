@@ -1,27 +1,37 @@
 #!/usr/bin/env python2
 
-import os, os.path
-import urlparse
-import urllib
+import hashlib
+import os
+import os.path
+import random
 import sys
-import hashlib, random
+import urllib
+import urlparse
 
-import web, web.http, web.form, web.session, web.contrib.template
+import openid.fetchers
+import openid.server.server
+import openid.store.filestore
+import web
+import web.contrib.template
+import web.form
+import web.http
+import web.session
 
-import openid.server.server, openid.store.filestore, openid.fetchers
 try:
     from openid.extensions import sreg
 except ImportError:
     from openid import sreg
-    
+
 import html5lib
 
-# if you're not running this on port 80
-#os.environ["SERVER_PORT"] = "1111" # string. not int.
 
-def _secure_homedomain(ctx):
+# if you're not running this on port 80
+# os.environ["SERVER_PORT"] = "1111" # string. not int.
+
+def homedomain(ctx):
     "Like ctx.homedomain but no http:// though it's a proxy :)"
-    return 'https://'+ctx.host
+    return ctx.homedomain
+
 
 class HCardParser(html5lib.HTMLParser):
     # based on code
@@ -29,10 +39,10 @@ class HCardParser(html5lib.HTMLParser):
     # Ivan Sagalaev, maniac@softwaremaniacs.org, 2010-05-05 19:12:52
 
     class HCard(object):
-        
+
         def __init__(self, tree):
             self.tree = tree
-            
+
         def __getitem__(self, key):
             if key in dir(self):
                 attr = self.__getattribute__(key)
@@ -42,8 +52,9 @@ class HCardParser(html5lib.HTMLParser):
                     return attr
             else:
                 return self._parse_property(key)
+
         get = __getitem__
-            
+
         def _parse_property(self, class_name):
             result = list()
             for el in HCardParser.getElementsByClassName(self.tree, class_name):
@@ -55,19 +66,19 @@ class HCardParser(html5lib.HTMLParser):
 
         def profile(self, required, optional=[]):
             TRANSLATION = {
-                    'fullname': { '__name__': 'Full name' },
-                    'dob': { '__name__': 'Date of Birth' },
-                    'gender': { 'M': 'Male', 'F': 'Female' },
-                    'postcode': { '__name__': 'Postal code' },
-                }
-                
+                'fullname': {'__name__': 'Full name'},
+                'dob': {'__name__': 'Date of Birth'},
+                'gender': {'M': 'Male', 'F': 'Female'},
+                'postcode': {'__name__': 'Postal code'},
+            }
+
             def item(field, value):
                 translation = TRANSLATION.get(field, {})
                 title = translation.get('__name__', field.title())
                 if value:
                     value = translation.get(value, value)
                 return (title, value)
-            
+
             profile = list()
             for field in required:
                 profile.append(item(field, self[field]))
@@ -76,13 +87,12 @@ class HCardParser(html5lib.HTMLParser):
                     profile.append(item(field, self[field]))
             return profile
 
-
         def gender(self):
             TITLES = {
-                    'mr': 'M',
-                    'ms': 'F',
-                    'mrs': 'F', 
-                }
+                'mr': 'M',
+                'ms': 'F',
+                'mrs': 'F',
+            }
             return \
                 self._parse_property('x-gender') or \
                 self._parse_property('gender') or \
@@ -94,24 +104,24 @@ class HCardParser(html5lib.HTMLParser):
                 return bday[:10]
             else:
                 return None
-                
+
         def nickname(self):
             return \
                 self._parse_property('nickname') or \
                 self._parse_property('fn')
-                    
+
         def fullname(self):
             return self['fn']
-            
+
         def postcode(self):
             return self['postal-code']
-        
+
         def country(self):
             return self['country-name']
-            
+
         def timezone(self):
             return self['tz']
-                
+
     @classmethod
     def getElementsByClassName(cls, node, class_name):
         nodes = list()
@@ -127,20 +137,19 @@ class HCardParser(html5lib.HTMLParser):
 
     def parse(self, *args, **kwargs):
         tree = super(HCardParser, self).parse(*args, **kwargs)
-        return (HCardParser.HCard(node) for node in HCardParser.getElementsByClassName(tree, 'vcard'))
-        
+        return (HCardParser.HCard(node) for node in
+                HCardParser.getElementsByClassName(tree, 'vcard'))
+
 
 class TrustRootStore(object):
     """
     Store and lookup over trust root list
     """
 
-
     def __init__(self, directory):
         self.directory = directory
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
-
 
     def _get_filename(self, url):
         """
@@ -153,20 +162,16 @@ class TrustRootStore(object):
 
         return os.path.join(self.directory, filename)
 
-
     def items(self):
         return [(item, os.readlink(os.path.join(self.directory, item)))
                 for item in os.listdir(self.directory)
                 if os.path.islink(os.path.join(self.directory, item))]
 
-
     def add(self, url):
         return os.symlink(url, self._get_filename(url))
 
-
     def check(self, url):
         return os.path.lexists(self._get_filename(url))
-
 
     def delete(self, url):
         return os.unlink(self._get_filename(url))
@@ -177,13 +182,11 @@ class OpenIDResponse(object):
     Handle requests to OpenID, including trust root lookups
     """
 
-
     class NoneRequest(Exception):
         """
         Raise if request is empty
         """
         pass
-
 
     class DecisionNeed(Exception):
         """
@@ -191,19 +194,16 @@ class OpenIDResponse(object):
         """
         pass
 
-
     class LogInNeed(Exception):
         """
         Raise if need user to be logged in
         """
         pass
 
-
     def _encode_response(self, response):
         self.response = response
         self.webresponse = self.openid.encodeResponse(self.response)
         return self.webresponse
-
 
     def __init__(self, server, openid, query):
         """
@@ -216,7 +216,6 @@ class OpenIDResponse(object):
 
         # parse openid request
         self.request = self.openid.decodeRequest(query)
-
 
     def process(self, logged_in=False):
         """
@@ -245,10 +244,8 @@ class OpenIDResponse(object):
             # last hope route to user decision
             raise OpenIDResponse.DecisionNeed
 
-
         # return openid.server.server.WebResponse
         return self._encode_response(self.openid.handleRequest(self.request))
-
 
     def approve(self, identity=None):
         """
@@ -260,23 +257,23 @@ class OpenIDResponse(object):
             identity = self.request.identity
 
         response = self.request.answer(
-                allow=True,
-                identity=identity
-            )
+            allow=True,
+            identity=identity
+        )
 
         try:
             hcards = HCardParser().parse_url(identity)
             if hcards:
                 sreg_data = hcards.next()
                 sreg_request = sreg.SRegRequest.fromOpenIDRequest(self.request)
-                sreg_response = sreg.SRegResponse.extractResponse(sreg_request, sreg_data)
+                sreg_response = sreg.SRegResponse.extractResponse(sreg_request,
+                                                                  sreg_data)
                 response.addExtension(sreg_response)
         except:
             pass
-            #TODO: fixme
+            # TODO: fixme
 
         return self._encode_response(response)
-
 
     def always(self, identity=None):
         """
@@ -284,7 +281,6 @@ class OpenIDResponse(object):
         """
         self.server.trust_root_store.add(self.request.trust_root)
         return self.approve(identity)
-
 
     def decline(self):
         """
@@ -302,7 +298,6 @@ class OpenIDServer(object):
     def __init__(self, openid_store, trust_root_store):
         self.openid_store = openid_store
         self.trust_root_store = trust_root_store
-
 
     def request(self, endpoint, query):
         openid_server = openid.server.server.Server(self.openid_store, endpoint)
@@ -326,10 +321,8 @@ class PasswordManager(web.form.Validator):
 
         self.msg = u'Invalid password'
 
-
     def _get_filename(self):
         return os.path.join(self.directory, 'password')
-
 
     def _generate_hash(self, salt, password):
         """
@@ -339,7 +332,6 @@ class PasswordManager(web.form.Validator):
         hash.update(salt.encode('utf8'))
         hash.update(password.encode('utf8'))
         return hash.hexdigest()
-
 
     def valid(self, password):
         """
@@ -363,7 +355,6 @@ class PasswordManager(web.form.Validator):
 
         return True
 
-
     def set(self, password):
         """
         Set password
@@ -381,7 +372,6 @@ class PasswordManager(web.form.Validator):
 
 
 class Session(web.session.Session):
-
     def login(self):
         session['logged_in'] = True
 
@@ -408,66 +398,63 @@ def render_openid_to_response(response):
 
 
 class WebHandler(object):
-
-
     def __init__(self):
         self.query = web.input()
         self.method = None
-
 
     def GET(self, *args, **kwargs):
         self.method = 'GET'
         return self.request(*args, **kwargs)
 
-
     def POST(self, *args, **kwargs):
         self.method = 'POST'
         return self.request(*args, **kwargs)
-
 
     def request(self):
         raise NotImplemented
 
 
 class WebOpenIDIndex(WebHandler):
-
-
     def request(self):
         web.header('Content-type', 'text/html')
         return render.base(
-                home_url=_secure_homedomain(web.ctx) + web.url('/'),
-                logged_in=session.logged_in,
-                login_url=_secure_homedomain(web.ctx) + web.url('/account/login'),
-                logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
-                change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
-                check_trusted_url=_secure_homedomain(web.ctx) + web.url('/account/trusted'),
-                no_password=session.get('no_password', False),
-                endpoint=_secure_homedomain(web.ctx) + web.url('/endpoint'),
-                yadis=_secure_homedomain(web.ctx) + web.url('/yadis.xrds'),
-            )
+            home_url=homedomain(web.ctx) + web.url('/'),
+            logged_in=session.logged_in,
+            login_url=homedomain(web.ctx) + web.url('/account/login'),
+            logout_url=homedomain(web.ctx) + web.url('/account/logout'),
+            change_password_url=homedomain(web.ctx) + web.url(
+                '/account/change_password'),
+            check_trusted_url=homedomain(web.ctx) + web.url(
+                '/account/trusted'),
+            no_password=session.get('no_password', False),
+            endpoint=homedomain(web.ctx) + web.url('/endpoint'),
+            yadis=homedomain(web.ctx) + web.url('/yadis.xrds'),
+        )
 
 
 def WebOpenIDLoginRequired(query):
-    query['return_to'] = _secure_homedomain(web.ctx) + web.url(web.ctx.path)
-    return web.found(_secure_homedomain(web.ctx) + web.url('/account/login', **query))
+    query['return_to'] = homedomain(web.ctx) + web.url(web.ctx.path)
+    return web.found(
+        homedomain(web.ctx) + web.url('/account/login', **query))
 
 
 def WebOpenIDLoginForm(validator):
     return web.form.Form(
-            web.form.Password("password",
-                validator,
-                description="Password: ",
-            ),
-        )
+        web.form.Password("password",
+                          validator,
+                          description="Password: ",
+                          ),
+    )
 
 
 class WebOpenIDLogin(WebHandler):
-
-
     def request(self):
-        return_to = self.query.get('return_to', _secure_homedomain(web.ctx) + web.url('/account'))
+        return_to = self.query.get('return_to',
+                                   homedomain(web.ctx) + web.url(
+                                       '/account'))
 
-        data = filter(lambda item: item[0] not in ['password'], self.query.items())
+        data = filter(lambda item: item[0] not in ['password'],
+                      self.query.items())
 
         form = WebOpenIDLoginForm(password_manager)()
 
@@ -478,54 +465,55 @@ class WebOpenIDLogin(WebHandler):
                 if form.validates(self.query):
                     session.login()
                     data.append(('logged_in', True))
-                    return web.found(return_to + '?' + web.http.urlencode(dict(data)))
+                    return web.found(
+                        return_to + '?' + web.http.urlencode(dict(data)))
 
             except PasswordManager.NoPassword:
                 session['no_password'] = True
                 session.login()
                 data.append(('logged_in', True))
-                return web.found(return_to + '?' + web.http.urlencode(dict(data)))
+                return web.found(
+                    return_to + '?' + web.http.urlencode(dict(data)))
 
         web.header('Content-type', 'text/html')
         return render.login(
-                home_url=_secure_homedomain(web.ctx) + web.url('/'),
-                logged_in=session.logged_in,
-                login_url=_secure_homedomain(web.ctx) + web.url('/account/login'),
-                logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
-                change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
-                no_password=session.get('no_password', False),
-                form=form,
-                query=data,
-            )
-
-
-class WebOpenIDLogout(WebHandler):
-
-
-    def request(self):
-        session.logout()
-        return web.found(_secure_homedomain(web.ctx) + web.url('/account/login'))
-
-
-WebOpenIDChangePasswordForm = web.form.Form(
-            web.form.Password("password",
-                web.form.notnull,
-                description="Password: ",
-            ),
-            web.form.Password("confirm",
-                web.form.notnull,
-                description="Retype: ",
-            ),
-            validators=[
-                    web.form.Validator('Passwords did not match',
-                        lambda source: source['password'] == source['confirm']),
-                ],
+            home_url=homedomain(web.ctx) + web.url('/'),
+            logged_in=session.logged_in,
+            login_url=homedomain(web.ctx) + web.url('/account/login'),
+            logout_url=homedomain(web.ctx) + web.url('/account/logout'),
+            change_password_url=homedomain(web.ctx) + web.url(
+                '/account/change_password'),
+            no_password=session.get('no_password', False),
+            form=form,
+            query=data,
         )
 
 
+class WebOpenIDLogout(WebHandler):
+    def request(self):
+        session.logout()
+        return web.found(
+            homedomain(web.ctx) + web.url('/account/login'))
+
+
+WebOpenIDChangePasswordForm = web.form.Form(
+    web.form.Password("password",
+                      web.form.notnull,
+                      description="Password: ",
+                      ),
+    web.form.Password("confirm",
+                      web.form.notnull,
+                      description="Retype: ",
+                      ),
+    validators=[
+        web.form.Validator('Passwords did not match',
+                           lambda source: source['password'] == source[
+                               'confirm']),
+    ],
+)
+
+
 class WebOpenIDChangePassword(WebHandler):
-
-
     def request(self):
         # check for login
         if not session.logged_in:
@@ -539,33 +527,34 @@ class WebOpenIDChangePassword(WebHandler):
 
                 session['no_password'] = False
 
-                return web.found(_secure_homedomain(web.ctx) + web.url('/account'))
+                return web.found(
+                    homedomain(web.ctx) + web.url('/account'))
 
         web.header('Content-type', 'text/html')
         return render.password(
-                home_url=_secure_homedomain(web.ctx) + web.url('/'),
-                logged_in=session.logged_in,
-                logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
-                change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
-                no_password=session.get('no_password', False),
-                form=form,
-            )
+            home_url=homedomain(web.ctx) + web.url('/'),
+            logged_in=session.logged_in,
+            logout_url=homedomain(web.ctx) + web.url('/account/logout'),
+            change_password_url=homedomain(web.ctx) + web.url(
+                '/account/change_password'),
+            no_password=session.get('no_password', False),
+            form=form,
+        )
 
 
 class WebOpenIDTrusted(WebHandler):
-
-
     def request(self):
         # check for login
         if not session.logged_in:
             return WebOpenIDLoginRequired(self.query)
 
         items = [
-                ((
-                    item[1],
-                    _secure_homedomain(web.ctx) + web.url('/account/trusted/%s/delete' % item[0])
-                ))
-                for item in trust_root_store.items()
+            ((
+                item[1],
+                homedomain(web.ctx) + web.url(
+                    '/account/trusted/%s/delete' % item[0])
+            ))
+            for item in trust_root_store.items()
             ]
 
         removed = session.get('trusted_removed_successful', False)
@@ -573,19 +562,18 @@ class WebOpenIDTrusted(WebHandler):
 
         web.header('Content-type', 'text/html')
         return render.trusted(
-                home_url=_secure_homedomain(web.ctx) + web.url('/'),
-                logged_in=session.logged_in,
-                logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
-                change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
-                no_password=session.get('no_password', False),
-                trusted=items,
-                removed=removed,
-            )
+            home_url=homedomain(web.ctx) + web.url('/'),
+            logged_in=session.logged_in,
+            logout_url=homedomain(web.ctx) + web.url('/account/logout'),
+            change_password_url=homedomain(web.ctx) + web.url(
+                '/account/change_password'),
+            no_password=session.get('no_password', False),
+            trusted=items,
+            removed=removed,
+        )
 
 
 class WebOpenIDTrustedDelete(WebHandler):
-
-
     def request(self, trusted_id):
         # check for login
         if not session.logged_in:
@@ -597,28 +585,30 @@ class WebOpenIDTrustedDelete(WebHandler):
             return web.notfound()
 
         if self.method == 'POST':
-                trust_root_store.delete(trust_root)
+            trust_root_store.delete(trust_root)
 
-                session['trusted_removed_successful']  = True
+            session['trusted_removed_successful'] = True
 
-                return web.found(_secure_homedomain(web.ctx) + web.url('/account/trusted'))
+            return web.found(
+                homedomain(web.ctx) + web.url('/account/trusted'))
 
         web.header('Content-type', 'text/html')
         return render.trusted_confirm(
-                home_url=_secure_homedomain(web.ctx) + web.url('/'),
-                logged_in=session.logged_in,
-                logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
-                change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
-                check_trusted_url=_secure_homedomain(web.ctx) + web.url('/account/trusted'),
-                trusted_remove_url=_secure_homedomain(web.ctx) + web.url('/account/trusted/%s/delete' % trusted_id),
-                no_password=session.get('no_password', False),
-                trust_root=trust_root,
-            )
+            home_url=homedomain(web.ctx) + web.url('/'),
+            logged_in=session.logged_in,
+            logout_url=homedomain(web.ctx) + web.url('/account/logout'),
+            change_password_url=homedomain(web.ctx) + web.url(
+                '/account/change_password'),
+            check_trusted_url=homedomain(web.ctx) + web.url(
+                '/account/trusted'),
+            trusted_remove_url=homedomain(web.ctx) + web.url(
+                '/account/trusted/%s/delete' % trusted_id),
+            no_password=session.get('no_password', False),
+            trust_root=trust_root,
+        )
 
 
 class WebOpenIDYadis(WebHandler):
-
-
     def request(self):
         import openid.consumer
         web.header('Content-type', 'application/xrds+xml')
@@ -632,21 +622,20 @@ class WebOpenIDYadis(WebHandler):
             <LocalID>%s</LocalID>
         </Service>
     </XRD>
-</xrds:XRDS>\n""" %\
-            (
-                openid.consumer.discover.OPENID_2_0_TYPE,
-                openid.consumer.discover.OPENID_1_0_TYPE,
-                _secure_homedomain(web.ctx) + web.url('/endpoint'),
-                _secure_homedomain(web.ctx),
-            )
+</xrds:XRDS>\n""" % \
+               (
+                   openid.consumer.discover.OPENID_2_0_TYPE,
+                   openid.consumer.discover.OPENID_1_0_TYPE,
+                   homedomain(web.ctx) + web.url('/endpoint'),
+                   homedomain(web.ctx),
+               )
 
 
 class WebOpenIDEndpoint(WebHandler):
-
-
     def request(self):
         # check for login
-        request = server.request(_secure_homedomain(web.ctx) + web.url('/endpoint'), self.query)
+        request = server.request(
+            homedomain(web.ctx) + web.url('/endpoint'), self.query)
         try:
             response = request.process(session.logged_in)
 
@@ -659,29 +648,29 @@ class WebOpenIDEndpoint(WebHandler):
 
         except OpenIDResponse.DecisionNeed:
             # redirect request to decision page in restricted area
-            return web.found(_secure_homedomain(web.ctx) + web.url('/account/decision', **self.query))
+            return web.found(
+                homedomain(web.ctx) + web.url('/account/decision',
+                                              **self.query))
 
         if self.query.get('logged_in', False):
             session.logout()
-
 
         return render_openid_to_response(response)
 
 
 WebOpenIDLogoutForm = web.form.Form(
-            web.form.Checkbox("logout", description="Log out after"),
-        )
+    web.form.Checkbox("logout", description="Log out after"),
+)
 
 
 class WebOpenIDDecision(WebHandler):
-
-
     def request(self):
         # check for login
         if not session.logged_in:
             return WebOpenIDLoginRequired(self.query)
 
-        request = server.request(_secure_homedomain(web.ctx) + web.url('/endpoint'), self.query)
+        request = server.request(
+            homedomain(web.ctx) + web.url('/endpoint'), self.query)
 
         try:
             response = request.process(logged_in=True)
@@ -704,21 +693,24 @@ class WebOpenIDDecision(WebHandler):
 
             else:
                 data = filter(
-                        lambda item: item[0] not in [
-                                'approve', 'always',
-                                'logged_in', 'logout'
-                            ],
-                        self.query.items())
+                    lambda item: item[0] not in [
+                        'approve', 'always',
+                        'logged_in', 'logout'
+                    ],
+                    self.query.items())
 
-                sreg_request = sreg.SRegRequest.fromOpenIDRequest(request.request)
+                sreg_request = sreg.SRegRequest.fromOpenIDRequest(
+                    request.request)
 
                 profile = None
                 if sreg_request.required or sreg_request.optional:
                     try:
-                        hcards = HCardParser().parse_url(request.request.identity)
+                        hcards = HCardParser().parse_url(
+                            request.request.identity)
                         if hcards:
                             hcard = hcards.next()
-                            profile = hcard.profile(sreg_request.required, sreg_request.optional)
+                            profile = hcard.profile(sreg_request.required,
+                                                    sreg_request.optional)
                     except:
                         pass
 
@@ -727,20 +719,24 @@ class WebOpenIDDecision(WebHandler):
 
                 web.header('Content-type', 'text/html')
                 return render.verify(
-                        home_url=_secure_homedomain(web.ctx) + web.url('/'),
-                        logged_in=session.logged_in,
-                        logout_url=_secure_homedomain(web.ctx) + web.url('/account/logout'),
-                        change_password_url=_secure_homedomain(web.ctx) + web.url('/account/change_password'),
-                        no_password=session.get('no_password', False),
-                        decision_url=_secure_homedomain(web.ctx) + web.url('/account/decision'),
-                        identity=request.request.identity,
-                        trust_root=request.request.trust_root,
-                        profile=profile,
-                        logout_form=logout_form,
-                        query=data,
-                    )
+                    home_url=homedomain(web.ctx) + web.url('/'),
+                    logged_in=session.logged_in,
+                    logout_url=homedomain(web.ctx) + web.url(
+                        '/account/logout'),
+                    change_password_url=homedomain(web.ctx) + web.url(
+                        '/account/change_password'),
+                    no_password=session.get('no_password', False),
+                    decision_url=homedomain(web.ctx) + web.url(
+                        '/account/decision'),
+                    identity=request.request.identity,
+                    trust_root=request.request.trust_root,
+                    profile=profile,
+                    logout_form=logout_form,
+                    query=data,
+                )
 
         return render_openid_to_response(response)
+
 
 ROOT_STORE = 'sstore'
 TEMPLATES = 'templates'
@@ -749,34 +745,34 @@ TRUST_ROOT_STORE = os.path.join(ROOT_STORE, 'trust_root')
 SESSION_STORE = os.path.join(ROOT_STORE, 'sessions')
 PASSWORD_STORE = ROOT_STORE
 
-def init(
-            root_store_path=ROOT_STORE,
-            trust_root_store_path=TRUST_ROOT_STORE,
-            session_store_path=SESSION_STORE,
-            password_store_path=PASSWORD_STORE,
-            templates_path=TEMPLATES,
-            debug=False
-        ):
 
+def init(
+        root_store_path=ROOT_STORE,
+        trust_root_store_path=TRUST_ROOT_STORE,
+        session_store_path=SESSION_STORE,
+        password_store_path=PASSWORD_STORE,
+        templates_path=TEMPLATES,
+        debug=False
+):
     context = globals()
 
     app = web.application(
-            (
-                '', 'WebOpenIDIndex',
-                '/', 'WebOpenIDIndex',
-                '/account', 'WebOpenIDIndex',
-                '/account/login', 'WebOpenIDLogin',
-                '/account/logout', 'WebOpenIDLogout',
-                '/account/change_password', 'WebOpenIDChangePassword',
-                '/account/trusted', 'WebOpenIDTrusted',
-                '/account/trusted/(?P<trusted_id>[^/]+)/delete', 'WebOpenIDTrustedDelete',
-                '/yadis.xrds', 'WebOpenIDYadis',
-                '/endpoint', 'WebOpenIDEndpoint',
-                '/account/decision', 'WebOpenIDDecision',
-            ),
-            context,
-        )
-
+        (
+            '', 'WebOpenIDIndex',
+            '/', 'WebOpenIDIndex',
+            '/account', 'WebOpenIDIndex',
+            '/account/login', 'WebOpenIDLogin',
+            '/account/logout', 'WebOpenIDLogout',
+            '/account/change_password', 'WebOpenIDChangePassword',
+            '/account/trusted', 'WebOpenIDTrusted',
+            '/account/trusted/(?P<trusted_id>[^/]+)/delete',
+            'WebOpenIDTrustedDelete',
+            '/yadis.xrds', 'WebOpenIDYadis',
+            '/endpoint', 'WebOpenIDEndpoint',
+            '/account/decision', 'WebOpenIDDecision',
+        ),
+        context,
+    )
 
     openid_store = openid.store.filestore.FileOpenIDStore(root_store_path)
     trust_root_store = TrustRootStore(trust_root_store_path)
@@ -801,4 +797,3 @@ def init(
 
 if __name__ == '__main__':
     init().run()
-

@@ -1,6 +1,7 @@
 # temp files
 *.pyc
 .*.swp
+.idea
 
 # debug files
 dist
