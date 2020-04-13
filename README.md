@@ -120,5 +120,5 @@ Visit http://ownopenidserver.com for more details.
 Bugs and suggestions
 --------------------
 
-Please report any bugs you have found to Vladimir S Eremin (aka yottatsa)
-<me@yottatsa.name>. Suggestions are also appreciated.
+Please report any bugs you have found to me@yottatsa.name. Suggestions are
+also appreciated.
