@@ -1,14 +1,14 @@
 This package was debianized by:
 
-    Vladimir S Eremin <me@yottatsa.name> on Sat, 05 Sep 2009 22:30:58 +0600
+    Atsuko Ito <me@yottatsa.name> on Sat, 05 Sep 2009 22:30:58 +0600
 
 Upstream Author(s):
 
-    Vladimir S Eremin <me@yottatsa.name>
+    Atsuko Ito <me@yottatsa.name>
 
 Copyright:
 
-    <Copyright (C) 2009 Vladimir Eremin>
+    <Copyright (C) 2009 Atsuko Ito>
 
 License:
 
@@ -30,6 +30,6 @@ Public License version 3 can be found in `/usr/share/common-licenses/GPL-3'.
 
 The Debian packaging is:
 
-    Copyright (C) 2009 Vladimir S Eremin <me@yottatsa.name>
+    Copyright (C) 2009 Atsuko Ito <me@yottatsa.name>
 
 and is licensed under the GPL version 3, see above.

@@ -111,14 +111,13 @@ You can also add to your page extra personal data in hCard format. Your
 *ownopenidserver* visits your page every time a consumer want to get more info
 about you identity.
 
-
 Project homepage
------------------
+----------------
 
-Visit http://ownopenidserver.com for more details.
+Visit [http://ownopenidserver.com](https://web.archive.org/web/20110615162453/ownopenidserver.com/) for more details.
 
 Bugs and suggestions
 --------------------
 
-Please report any bugs you have found to Vladimir S Eremin (aka yottatsa)
+Please report any bugs you have found to Atsuko Ito (aka yottatsa)
 <me@yottatsa.name>. Suggestions are also appreciated.
