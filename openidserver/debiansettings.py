@@ -1,0 +1,5 @@
+ROOT_STORE = '/var/spool/openidserver'
+TEMPLATES = '/usr/share/openidserver/templates'
+TRUST_ROOT_STORE = '/var/lib/openidserver'
+SESSION_STORE = '/var/spool/openidserver/sessions'
+PASSWORD_STORE = '/etc/openidserver'

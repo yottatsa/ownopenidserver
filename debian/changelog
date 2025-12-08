@@ -1,0 +1,43 @@
+openidserver (1.0) unstable; urgency=low
+
+  * I think it is ready for release
+  
+ --  <me@yottatsa.name>  Wed, 18 May 2011 17:01:50 +0600
+
+openidserver (0.11) unstable; urgency=low
+
+  * Automagically logout when user logged in just at the verification
+    process and site has been marked as trusted. (Closes #2)
+
+ --  <me@yottatsa.name>  Wed, 17 Nov 2010 11:42:34 +0500
+
+openidserver (0.10) unstable; urgency=low
+
+  * Automagically logout when logged in just now for confirm identity
+
+ --  <me@yottatsa.name>  Mon, 01 Nov 2010 16:46:56 +0500
+
+openidserver (0.9) unstable; urgency=low
+
+  * Looks like it ready to fly. And SREG works nice.
+
+ -- Atsuko Ito <me@yottatsa.name>  Thu, 22 Jul 2010 16:30:31 +0600
+
+openidserver (0.1.0-3) unstable; urgency=low
+
+  * Reduce memory consumption
+
+ -- Atsuko Ito <me@yottatsa.name>  Fri, 08 Jan 2010 23:31:32 +0500
+
+openidserver (0.1.0-2) unstable; urgency=low
+
+  * Apply changes from git
+  * Add suggests
+
+ -- Atsuko Ito <me@yottatsa.name>  Wed, 09 Dec 2009 00:27:37 +0500
+
+openidserver (0.1.0-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Atsuko Ito <me@yottatsa.name>  Sat, 05 Sep 2009 22:30:58 +0600
